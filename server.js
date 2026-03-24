@@ -7,6 +7,7 @@ const { MongoClient } = require('mongodb');
 const { log } = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const storageController = require('./controllers/storageController');
+const liveData = require('./services/liveData');
 const pjson = require('./package.json');
 
 const app = express();
@@ -26,6 +27,9 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/v1/storage', require('./routes/storage.routes'));
 app.use('/api/v1/system', require('./routes/system.routes'));
+app.use('/api/v1/network', require('./routes/network.routes'));
+app.use('/api/v1/events', require('./routes/events.routes'));
+app.use('/api/v1/livedata', require('./routes/livedata.routes'));
 
 // Error handler
 app.use(errorHandler);
@@ -49,8 +53,14 @@ async function start() {
   // Cleanup stale scans from previous session
   await storageController.cleanupStaleScans(db);
 
-  server = app.listen(PORT, () => {
+  server = app.listen(PORT, async () => {
     log(`agentx-data listening on port ${PORT}`);
+
+    // Initialize live data after server is up (interval-based fetchers)
+    if (process.env.NODE_ENV !== 'test') {
+      try { await liveData.init(db); }
+      catch (e) { log(`[liveData] Init failed: ${e.message}`, 'warn'); }
+    }
   });
 
   server.on('error', (err) => {
@@ -64,6 +74,7 @@ async function start() {
 }
 
 async function shutdown() {
+  await liveData.close();
   if (server) await new Promise(r => server.close(r));
   if (client) await client.close();
   log('agentx-data shut down.');
