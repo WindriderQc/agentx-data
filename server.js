@@ -30,6 +30,10 @@ app.use('/api/v1/system', require('./routes/system.routes'));
 app.use('/api/v1/network', require('./routes/network.routes'));
 app.use('/api/v1/events', require('./routes/events.routes'));
 app.use('/api/v1/livedata', require('./routes/livedata.routes'));
+app.use('/api/v1/databases', require('./routes/databases.routes'));
+app.use('/api/v1/exports', require('./routes/exports.routes'));
+app.use('/api/v1/janitor', require('./routes/janitor.routes'));
+app.use('/api/v1/integrations', require('./routes/integrations.routes'));
 
 // Error handler
 app.use(errorHandler);

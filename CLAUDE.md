@@ -98,7 +98,51 @@ Host health monitoring.
 | `/api/v1/system/resources` | GET | CPU, memory, load, uptime |
 
 ### Database Browser
-**Status:** Planned (Phase 4) — inspect any MongoDB collection via API.
+Inspect any MongoDB collection — list, query, get stats, fetch documents.
+**Consumer:** Admin/debug for all services
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/databases/collections` | GET | List all collections with counts + sizes |
+| `/api/v1/databases/collections/:name` | GET | Query docs with pagination + JSON filter `?q={}` |
+| `/api/v1/databases/collections/:name/stats` | GET | Collection stats + schema fields |
+| `/api/v1/databases/collections/:name/:id` | GET | Get single document |
+
+### File Exports
+Generate optimized reports from indexed NAS data.
+**Consumer:** Admin, n8n workflows
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/exports/generate` | POST | Generate report (full/summary/media/large/stats, json/csv) |
+| `/api/v1/exports` | GET | List generated export files |
+| `/api/v1/exports/:filename` | DELETE | Delete an export file |
+
+### Disk Janitor
+Live directory analysis — hash files, find dupes, suggest + execute cleanup.
+**Consumer:** Admin, n8n automation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/janitor/analyze` | POST | Analyze a directory (hash, dedup) |
+| `/api/v1/janitor/suggest` | POST | Generate cleanup suggestions by policy |
+| `/api/v1/janitor/execute` | POST | Execute cleanup (dry_run default, safety blocklist) |
+| `/api/v1/janitor/policies` | GET | List available cleanup policies |
+
+### Integrations
+Webhook sink for n8n, ClickUp, and generic sources.
+**Consumer:** n8n, external workflows
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/integrations/events/n8n` | POST | Log n8n event |
+| `/api/v1/integrations/events/n8n` | GET | Retrieve n8n events |
+| `/api/v1/integrations/webhooks/clickup` | POST | ClickUp webhook sink |
+| `/api/v1/integrations/webhooks/:source` | POST | Generic webhook sink |
+
+### Generic CRUD Factory
+Utility module — not a route, but available for creating instant CRUD endpoints.
+**Usage:** `const ctrl = require('./utils/genericCrud')('myCollection');`
 
 ---
 
@@ -117,6 +161,7 @@ Host health monitoring.
 | `quakes` | Daily earthquake data |
 | `pressures` | Weather pressure readings |
 | `weatherLocations` | Registered weather tracking locations |
+| `integration_events` | Webhook event inbox (n8n, ClickUp, etc.) |
 
 ## Directory Structure
 
@@ -127,18 +172,24 @@ data/
 ├── .env.example
 ├── CLAUDE.md
 ├── routes/
-│   ├── storage.routes.js       # Scanner + file browser + janitor
+│   ├── storage.routes.js       # Scanner + file browser + datalake janitor
 │   ├── network.routes.js       # Network discovery
 │   ├── livedata.routes.js      # Live data ingestion
 │   ├── events.routes.js        # Event feed + SSE
+│   ├── databases.routes.js     # Database browser
+│   ├── exports.routes.js       # File export reports
+│   ├── janitor.routes.js       # Disk analyzer + cleanup
+│   ├── integrations.routes.js  # Webhook sinks
 │   └── system.routes.js        # System resources
 ├── controllers/
-│   ├── storageController.js    # Scan lifecycle
-│   ├── fileBrowserController.js # File search, stats, dedup, janitor
-│   ├── networkController.js    # Device CRUD + scan + enrich
-│   ├── liveDataController.js   # Config + data access
-│   ├── eventController.js      # Event CRUD + SSE stream
-│   └── systemController.js     # CPU/memory/load
+│   ├── storageController.js
+│   ├── fileBrowserController.js
+│   ├── networkController.js
+│   ├── liveDataController.js
+│   ├── eventController.js
+│   ├── databasesController.js
+│   ├── exportController.js
+│   └── systemController.js
 ├── services/
 │   ├── scanner.js              # File scanner (EventEmitter, SHA256)
 │   ├── networkScanner.js       # nmap wrapper
@@ -151,5 +202,6 @@ data/
     ├── eventEmitter.js         # Shared pub/sub bus
     ├── fetch-utils.js          # HTTP fetch with timeout + retry
     ├── file-operations.js
+    ├── genericCrud.js          # CRUD factory for any collection
     └── logger.js
 ```
