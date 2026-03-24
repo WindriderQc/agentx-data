@@ -25,6 +25,8 @@ Indexes files across NAS/disk with SHA256 hashing for deduplication.
 | `/api/v1/storage/status/:scan_id` | GET | Get scan progress |
 | `/api/v1/storage/stop/:scan_id` | POST | Stop a running scan |
 | `/api/v1/storage/summary` | GET | Storage overview (totals, dupes, last scan) |
+| `/api/v1/storage/directory-count` | GET | Count indexed directories |
+| `/api/v1/storage/scan/:scan_id` | GET | Get scan status (alias) |
 | `/api/v1/storage/scan/:scan_id/batch` | POST | Insert file batch (n8n workflow) |
 | `/api/v1/storage/scan/:scan_id` | PATCH | Update scan status |
 

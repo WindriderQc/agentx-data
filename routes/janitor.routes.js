@@ -17,6 +17,12 @@ const POLICIES = {
 
 const BLOCKLIST = ['/', '/home', '/usr', '/bin', '/etc', '/var', '/sys', '/proc'];
 
+function validatePath(p) {
+  if (!p || typeof p !== 'string') return false;
+  const resolved = path.resolve(p);
+  return !BLOCKLIST.some(b => resolved === b || resolved.startsWith(b + '/'));
+}
+
 async function analyzeDirectory(dirPath) {
   const fileMap = new Map();
   let totalFiles = 0, totalSize = 0, scannedFiles = 0;
@@ -71,6 +77,7 @@ async function analyzeDirectory(dirPath) {
 router.post('/analyze', async (req, res) => {
   const { path: scanPath } = req.body;
   if (!scanPath) return res.status(400).json({ status: 'error', message: 'path required' });
+  if (!validatePath(scanPath)) return res.status(403).json({ status: 'error', message: 'Path blocked by safety policy' });
   try {
     const result = await analyzeDirectory(scanPath);
     delete result.fileMap; // don't leak internal map
@@ -81,6 +88,7 @@ router.post('/analyze', async (req, res) => {
 router.post('/suggest', async (req, res) => {
   const { path: scanPath, policies } = req.body;
   if (!scanPath) return res.status(400).json({ status: 'error', message: 'path required' });
+  if (!validatePath(scanPath)) return res.status(403).json({ status: 'error', message: 'Path blocked by safety policy' });
   try {
     const analysis = await analyzeDirectory(scanPath);
     const active = policies || Object.keys(POLICIES).filter(k => POLICIES[k].enabled);
@@ -121,7 +129,7 @@ router.post('/execute', async (req, res) => {
 
   for (const filePath of files) {
     if (!filePath || typeof filePath !== 'string') { results.failed.push({ file: filePath, reason: 'Invalid path' }); continue; }
-    if (BLOCKLIST.includes(filePath) || !path.isAbsolute(filePath)) { results.failed.push({ file: filePath, reason: 'Blocked by safety policy' }); continue; }
+    if (!path.isAbsolute(filePath) || !validatePath(filePath)) { results.failed.push({ file: filePath, reason: 'Blocked by safety policy' }); continue; }
     const stats = await fs.stat(filePath).catch(() => null);
     if (!stats) { results.failed.push({ file: filePath, reason: 'Not found' }); continue; }
     if (!isDryRun) await fs.unlink(filePath);

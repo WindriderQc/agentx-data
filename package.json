@@ -1,7 +1,7 @@
 {
   "name": "agentx-data",
   "version": "1.0.0",
-  "description": "AgentX Data — storage scanning, file browsing, network discovery, system resources, live data ingestion",
+  "description": "AgentX Data — data toolbox service (storage, files, network, live data, events, database browser, exports, janitor, integrations)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

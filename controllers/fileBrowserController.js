@@ -15,9 +15,10 @@ class FileBrowserController {
       } = req.query;
 
       const filter = {};
-      if (search) filter.filename = { $regex: search, $options: 'i' };
+      const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (search) filter.filename = { $regex: escRe(search), $options: 'i' };
       if (ext) filter.ext = ext.toLowerCase();
-      if (dirname) filter.dirname = { $regex: `^${dirname}`, $options: 'i' };
+      if (dirname) filter.dirname = { $regex: `^${escRe(dirname)}`, $options: 'i' };
       if (scan_id) filter.scan_id = scan_id;
       if (hasHash === 'true') filter.sha256 = { $exists: true, $ne: null };
       else if (hasHash === 'false') filter.$or = [{ sha256: { $exists: false } }, { sha256: null }];
@@ -59,8 +60,9 @@ class FileBrowserController {
     try {
       const db = req.app.locals.db;
       const { root = '/' } = req.query;
+      const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const dirs = await db.collection('nas_directories')
-        .find({ path: { $regex: `^${root}` } }).toArray();
+        .find({ path: { $regex: `^${escRe(root)}` } }).toArray();
 
       res.json({
         status: 'success',
@@ -335,14 +337,14 @@ class FileBrowserController {
         { _id: id }, { $set: { ...updates, updated_at: new Date() } }, { returnDocument: 'after' }
       );
 
-      if (!result.value) {
+      if (!result) {
         result = await db.collection('nas_files').findOneAndUpdate(
           { path: id }, { $set: { ...updates, updated_at: new Date() } }, { returnDocument: 'after' }
         );
-        if (!result.value) return res.status(404).json({ status: 'error', message: `File not found: ${id}` });
+        if (!result) return res.status(404).json({ status: 'error', message: `File not found: ${id}` });
       }
 
-      res.json({ status: 'success', message: 'File updated successfully', data: result.value });
+      res.json({ status: 'success', message: 'File updated successfully', data: result });
     } catch (error) { next(error); }
   }
 

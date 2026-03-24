@@ -19,6 +19,11 @@ exports.scanNetwork = async (req, res, next) => {
     const { target, pruneMissing } = req.body;
     const scanTarget = target || DEFAULT_TARGET;
 
+    // Validate CIDR format to prevent nmap flag injection
+    if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/.test(scanTarget)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid target format. Use CIDR notation: x.x.x.x/xx' });
+    }
+
     const discoveredDevices = await networkScanner.scanNetwork(scanTarget);
 
     const bulkOps = discoveredDevices.map(device => ({
@@ -79,8 +84,8 @@ exports.updateDevice = async (req, res, next) => {
       filter, { $set: update }, { returnDocument: 'after' }
     );
 
-    if (!result.value) return res.status(404).json({ status: 'error', message: 'Device not found' });
-    res.json({ status: 'success', data: { device: result.value } });
+    if (!result) return res.status(404).json({ status: 'error', message: 'Device not found' });
+    res.json({ status: 'success', data: { device: result } });
   } catch (error) { next(error); }
 };
 

@@ -44,6 +44,9 @@ const scan = async (req, res) => {
       scanId: scan_id,
       computeHashes: compute_hashes === true,
       hashMaxSize: hash_max_size || 100 * 1024 * 1024
+    }).catch(err => {
+      console.error(`[Storage] Scan ${scan_id} failed:`, err.message);
+      runningScans.delete(scan_id);
     });
 
     res.json({

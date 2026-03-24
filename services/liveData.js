@@ -1,4 +1,3 @@
-const fs = require('fs');
 const mqttClient = require('./mqttClient');
 const { fetchWithTimeoutAndRetry } = require('../utils/fetch-utils');
 const { log } = require('../utils/logger');
@@ -160,13 +159,13 @@ async function init(dbConnection) {
     );
   }
 
+  // reloadConfig already calls startIntervals(false) — don't duplicate
   await reloadConfig();
 
   if (state.liveDataEnabled && state.iss && process.env.MQTT_BROKER_URL) {
     mqttClient.init();
   }
 
-  startIntervals(true);
   initialized = true;
   log('[liveData] Initialized');
 }
