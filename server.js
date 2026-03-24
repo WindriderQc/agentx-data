@@ -20,6 +20,7 @@ app.use(express.json({ limit: '10mb' }));
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 
 // Health
+app.get('/', (req, res) => res.redirect('/health'));
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'agentx-data', version: pjson.version, ts: Date.now() });
 });
