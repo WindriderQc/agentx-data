@@ -61,11 +61,117 @@ describe('Constants', () => {
   });
 });
 
-// ── analyzeDirectory ──────────────────────────────────────────
+// ── buildSuggestions ─────────────────────────────────────────
 
-const { analyzeDirectory } = require('../../services/janitorService');
+const { buildSuggestions, generateCleanupToken, executeCleanup, analyzeDirectory } = require('../../services/janitorService');
 const fsMod = require('fs/promises');
 const fsSync = require('fs');
+
+describe('buildSuggestions', () => {
+  test('suggests deleting newer duplicates, keeping oldest', () => {
+    const fileMap = new Map();
+    fileMap.set('hash1', [
+      { path: '/mnt/datalake/old.txt', size: 100, mtime: new Date('2024-01-01') },
+      { path: '/mnt/datalake/new.txt', size: 100, mtime: new Date('2025-06-01') }
+    ]);
+    const analysis = { duplicate_groups: [{ hash: 'hash1', count: 2, wasted: 100 }], _fileMap: fileMap };
+    const suggestions = buildSuggestions(analysis, ['delete_duplicates']);
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0].policy).toBe('delete_duplicates');
+    expect(suggestions[0].files).toEqual(['/mnt/datalake/new.txt']);
+    expect(suggestions[0].space_saved).toBe(100);
+  });
+
+  test('suggests removing old temp files', () => {
+    const fileMap = new Map();
+    const oldDate = new Date(Date.now() - 30 * 86400000);
+    fileMap.set('hash2', [
+      { path: '/mnt/datalake/tmp/old.log', size: 500, mtime: oldDate }
+    ]);
+    const analysis = { duplicate_groups: [], _fileMap: fileMap };
+    const suggestions = buildSuggestions(analysis, ['remove_temp_files']);
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0].policy).toBe('remove_temp_files');
+  });
+
+  test('returns empty when no policies match', () => {
+    const analysis = { duplicate_groups: [], _fileMap: new Map() };
+    const suggestions = buildSuggestions(analysis, []);
+    expect(suggestions).toHaveLength(0);
+  });
+});
+
+// ── generateCleanupToken ────────────────────────────────────
+
+describe('generateCleanupToken', () => {
+  test('produces consistent 16-char hex token', () => {
+    const files = ['/mnt/datalake/a.txt', '/mnt/datalake/b.txt'];
+    const t1 = generateCleanupToken(files);
+    const t2 = generateCleanupToken(files);
+    expect(t1).toBe(t2);
+    expect(t1).toHaveLength(16);
+    expect(/^[0-9a-f]{16}$/.test(t1)).toBe(true);
+  });
+
+  test('order-independent (sorted internally)', () => {
+    const t1 = generateCleanupToken(['/z.txt', '/a.txt']);
+    const t2 = generateCleanupToken(['/a.txt', '/z.txt']);
+    expect(t1).toBe(t2);
+  });
+});
+
+// ── executeCleanup ──────────────────────────────────────────
+
+describe('executeCleanup', () => {
+  test('dry run reports would_delete without unlinking', async () => {
+    const origStat = fsMod.stat;
+    fsMod.stat = jest.fn().mockResolvedValue({ size: 1024 });
+    const files = ['/mnt/datalake/photos/dup.jpg'];
+    const token = generateCleanupToken(files);
+    const result = await executeCleanup(files, token, true);
+    expect(result.ok).toBe(true);
+    expect(result.dry_run).toBe(true);
+    expect(result.deleted).toHaveLength(1);
+    expect(result.deleted[0].action).toBe('would_delete');
+    expect(result.space_freed).toBe(1024);
+    fsMod.stat = origStat;
+  });
+
+  test('rejects invalid confirmation token', async () => {
+    const result = await executeCleanup(['/mnt/datalake/a.txt'], 'bad-token', true);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Invalid confirmation token/);
+    expect(result.expected_token).toBeUndefined(); // C3 fix
+  });
+
+  test('rejects paths outside allowlist', async () => {
+    const files = ['/etc/passwd'];
+    const token = generateCleanupToken(files);
+    const result = await executeCleanup(files, token, true);
+    expect(result.ok).toBe(true);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].reason).toMatch(/safety policy/i);
+  });
+
+  test('handles per-file errors without aborting batch', async () => {
+    const origStat = fsMod.stat;
+    const origUnlink = fsMod.unlink;
+    fsMod.stat = jest.fn()
+      .mockResolvedValueOnce({ size: 100 })
+      .mockRejectedValueOnce(new Error('ENOENT'));
+    fsMod.unlink = jest.fn().mockResolvedValue(undefined);
+    const files = ['/mnt/datalake/good.txt', '/mnt/datalake/gone.txt'];
+    const token = generateCleanupToken(files);
+    const result = await executeCleanup(files, token, false);
+    expect(result.ok).toBe(true);
+    expect(result.deleted).toHaveLength(1);
+    expect(result.failed).toHaveLength(1);
+    fsMod.stat = origStat;
+    fsMod.unlink = origUnlink;
+  });
+});
+
+// ── analyzeDirectory ──────────────────────────────────────────
 
 describe('analyzeDirectory', () => {
   test('returns analysis with duplicate groups', async () => {

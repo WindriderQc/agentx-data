@@ -135,11 +135,120 @@ async function analyzeDirectory(dirPath) {
   };
 }
 
+// ── Build suggestions from analysis ────────────────────────────
+/**
+ * Generate cleanup suggestions from an analysis result.
+ *
+ * @param {Object} analysis - Result from analyzeDirectory (must include _fileMap, duplicate_groups)
+ * @param {string[]} activePolicies - Array of active policy IDs
+ * @returns {Array<{policy, action, files, reason, space_saved}>}
+ */
+function buildSuggestions(analysis, activePolicies) {
+  const suggestions = [];
+
+  if (activePolicies.includes('delete_duplicates')) {
+    for (const group of analysis.duplicate_groups) {
+      const files = Array.from(analysis._fileMap.get(group.hash))
+        .sort((a, b) => new Date(a.mtime) - new Date(b.mtime));
+      const toDelete = files.slice(1);
+      if (toDelete.length > 0) {
+        suggestions.push({
+          policy: 'delete_duplicates',
+          action: 'delete',
+          files: toDelete.map(f => f.path),
+          reason: `Duplicate of ${files[0].path}`,
+          space_saved: group.wasted
+        });
+      }
+    }
+  }
+
+  if (activePolicies.includes('remove_temp_files')) {
+    const ageDays = POLICIES.remove_temp_files.age_days || 7;
+    const cutoff = new Date(Date.now() - ageDays * 86400000);
+    for (const [, files] of analysis._fileMap) {
+      for (const file of files) {
+        if ((file.path.includes('/temp/') || file.path.includes('/tmp/')) && new Date(file.mtime) < cutoff) {
+          suggestions.push({
+            policy: 'remove_temp_files',
+            action: 'delete',
+            files: [file.path],
+            reason: 'Old temp file',
+            space_saved: file.size
+          });
+        }
+      }
+    }
+  }
+
+  return suggestions;
+}
+
+// ── Cleanup token generation ──────────────────────────────────
+/**
+ * Generate a confirmation token for a set of file paths.
+ * Token = SHA256 of sorted paths joined with newline, truncated to 16 hex chars.
+ *
+ * @param {string[]} filePaths
+ * @returns {string} 16-char hex token
+ */
+function generateCleanupToken(filePaths) {
+  const sorted = [...filePaths].sort();
+  return crypto.createHash('sha256')
+    .update(sorted.join('\n'))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+// ── Execute cleanup ───────────────────────────────────────────
+/**
+ * Execute file cleanup with token validation and per-file error handling.
+ * SECURITY: Never returns expected_token on mismatch (C3 fix).
+ *
+ * @param {string[]} filePaths - Files to delete
+ * @param {string} token - Confirmation token from generateCleanupToken
+ * @param {boolean} dryRun - If true, report only without deleting
+ * @returns {Promise<Object>} Result with ok, dry_run, total_files, deleted, failed, space_freed
+ */
+async function executeCleanup(filePaths, token, dryRun) {
+  const expectedToken = generateCleanupToken(filePaths);
+  if (token !== expectedToken) {
+    return { ok: false, error: 'Invalid confirmation token' };
+  }
+
+  const results = { ok: true, dry_run: dryRun, total_files: filePaths.length, deleted: [], failed: [], space_freed: 0 };
+
+  for (const filePath of filePaths) {
+    if (!validatePath(filePath)) {
+      results.failed.push({ file: filePath, reason: 'Blocked by safety policy' });
+      continue;
+    }
+
+    try {
+      const stats = await fs.stat(filePath);
+      if (dryRun) {
+        results.deleted.push({ file: filePath, action: 'would_delete', size: stats.size });
+      } else {
+        await fs.unlink(filePath);
+        results.deleted.push({ file: filePath, action: 'deleted', size: stats.size });
+      }
+      results.space_freed += stats.size;
+    } catch (err) {
+      results.failed.push({ file: filePath, reason: err.message });
+    }
+  }
+
+  return results;
+}
+
 module.exports = {
   validatePath,
   ALLOWED_ROOTS,
   POLICIES,
   MAX_SCAN_FILES,
   MAX_HASH_SIZE,
-  analyzeDirectory
+  analyzeDirectory,
+  buildSuggestions,
+  generateCleanupToken,
+  executeCleanup
 };
