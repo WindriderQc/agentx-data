@@ -7,6 +7,9 @@
  * - Shared constants for scan/hash limits
  */
 const path = require('path');
+const fs = require('fs/promises');
+const fsSync = require('fs');
+const crypto = require('crypto');
 
 // ── Allowed roots ───────────────────────────────────────────────
 // Only directories under these roots can be scanned or cleaned.
@@ -62,10 +65,81 @@ function validatePath(p) {
   );
 }
 
+// ── Directory analysis ─────────────────────────────────────────
+/**
+ * Analyze a directory: hash files, find duplicates.
+ * Returns analysis object (with internal _fileMap for downstream use).
+ */
+async function analyzeDirectory(dirPath) {
+  const fileMap = new Map();
+  let totalFiles = 0, totalSize = 0, scannedFiles = 0;
+
+  async function scan(dir) {
+    if (totalFiles >= MAX_SCAN_FILES) return;
+    let entries;
+    try { entries = await fs.readdir(dir, { withFileTypes: true }); }
+    catch { return; }
+
+    for (const entry of entries) {
+      if (totalFiles >= MAX_SCAN_FILES) break;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) { await scan(fullPath); continue; }
+      if (!entry.isFile()) continue;
+
+      let stats;
+      try { stats = await fs.stat(fullPath); }
+      catch { continue; }
+
+      totalFiles++;
+      totalSize += stats.size;
+      if (stats.size > MAX_HASH_SIZE) continue;
+
+      try {
+        const hash = await new Promise((resolve, reject) => {
+          const h = crypto.createHash('sha256');
+          const stream = fsSync.createReadStream(fullPath);
+          stream.on('error', reject);
+          stream.on('data', chunk => h.update(chunk));
+          stream.on('end', () => resolve(h.digest('hex')));
+        });
+        if (!fileMap.has(hash)) fileMap.set(hash, []);
+        fileMap.get(hash).push({ path: fullPath, size: stats.size, mtime: stats.mtime });
+        scannedFiles++;
+      } catch { /* skip unreadable files */ }
+    }
+  }
+
+  await scan(dirPath);
+
+  const duplicates = [];
+  for (const [hash, files] of fileMap.entries()) {
+    if (files.length > 1) {
+      duplicates.push({
+        hash, count: files.length,
+        files: files.map(f => f.path),
+        size: files[0].size,
+        wasted: files[0].size * (files.length - 1)
+      });
+    }
+  }
+
+  return {
+    path: dirPath,
+    total_files: totalFiles,
+    scanned_files: scannedFiles,
+    total_size: totalSize,
+    duplicates_count: duplicates.length,
+    wasted_space: duplicates.reduce((s, d) => s + d.wasted, 0),
+    duplicate_groups: duplicates.slice(0, 50),
+    _fileMap: fileMap
+  };
+}
+
 module.exports = {
   validatePath,
   ALLOWED_ROOTS,
   POLICIES,
   MAX_SCAN_FILES,
-  MAX_HASH_SIZE
+  MAX_HASH_SIZE,
+  analyzeDirectory
 };

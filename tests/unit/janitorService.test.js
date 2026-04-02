@@ -60,3 +60,63 @@ describe('Constants', () => {
     expect(MAX_HASH_SIZE).toBe(104857600);
   });
 });
+
+// ── analyzeDirectory ──────────────────────────────────────────
+
+const { analyzeDirectory } = require('../../services/janitorService');
+const fsMod = require('fs/promises');
+const fsSync = require('fs');
+
+describe('analyzeDirectory', () => {
+  test('returns analysis with duplicate groups', async () => {
+    const origReaddir = fsMod.readdir;
+    const origStat = fsMod.stat;
+    const origCreateReadStream = fsSync.createReadStream;
+
+    const entries = [
+      { name: 'a.txt', isDirectory: () => false, isFile: () => true },
+      { name: 'b.txt', isDirectory: () => false, isFile: () => true },
+      { name: 'c.txt', isDirectory: () => false, isFile: () => true }
+    ];
+
+    fsMod.readdir = jest.fn().mockResolvedValue(entries);
+    fsMod.stat = jest.fn().mockResolvedValue({ size: 100, mtime: new Date('2025-01-01') });
+
+    const { PassThrough } = require('stream');
+    fsSync.createReadStream = jest.fn(() => {
+      const s = new PassThrough();
+      process.nextTick(() => { s.push('same-content'); s.push(null); });
+      return s;
+    });
+
+    const result = await analyzeDirectory('/mnt/datalake/test');
+
+    expect(result.total_files).toBe(3);
+    expect(result.scanned_files).toBe(3);
+    expect(result.duplicates_count).toBe(1);
+    expect(result.duplicate_groups[0].count).toBe(3);
+    expect(result.duplicate_groups[0].wasted).toBe(200);
+
+    fsMod.readdir = origReaddir;
+    fsMod.stat = origStat;
+    fsSync.createReadStream = origCreateReadStream;
+  });
+
+  test('skips files larger than MAX_HASH_SIZE for hashing', async () => {
+    const origReaddir = fsMod.readdir;
+    const origStat = fsMod.stat;
+
+    fsMod.readdir = jest.fn().mockResolvedValue([
+      { name: 'big.bin', isDirectory: () => false, isFile: () => true }
+    ]);
+    fsMod.stat = jest.fn().mockResolvedValue({ size: 200 * 1024 * 1024, mtime: new Date() });
+
+    const result = await analyzeDirectory('/mnt/datalake/test');
+
+    expect(result.total_files).toBe(1);
+    expect(result.scanned_files).toBe(0);
+
+    fsMod.readdir = origReaddir;
+    fsMod.stat = origStat;
+  });
+});
