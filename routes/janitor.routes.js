@@ -1,6 +1,7 @@
 /**
  * Janitor — live disk analysis + cleanup with safety checks.
  * Scans real directories (not just DB), hashes files, finds dupes.
+ * Also: dedup report pipeline (scan, report, approve).
  */
 const router = require('express').Router();
 const fs = require('fs/promises');
@@ -8,6 +9,7 @@ const fsSync = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
+const dedupScanner = require('../services/dedupScanner');
 
 const POLICIES = {
   delete_duplicates: { id: 'delete_duplicates', name: 'Delete Duplicate Files', description: 'Keep oldest copy, delete newer duplicates', enabled: true },
@@ -142,6 +144,88 @@ router.post('/execute', async (req, res) => {
 
 router.get('/policies', (req, res) => {
   res.json({ status: 'success', data: { policies: Object.values(POLICIES) } });
+});
+
+// ──────────────────────────────────────────────
+// Dedup Report Pipeline
+// ──────────────────────────────────────────────
+
+/**
+ * POST /dedup-scan — trigger a new dedup analysis.
+ * Body: { root_path?, extensions?, max_depth? }
+ */
+router.post('/dedup-scan', async (req, res) => {
+  const db = req.app.locals.db;
+  if (!db) return res.status(503).json({ status: 'error', message: 'Database not ready' });
+
+  const { root_path, extensions, max_depth } = req.body;
+  try {
+    const report = await dedupScanner.buildDedupReport(db, {
+      rootPath: root_path || '/mnt/datalake/',
+      extensions: extensions || [],
+      maxDepth: max_depth || null
+    });
+    const reportId = await dedupScanner.saveReport(db, report);
+    log(`Dedup scan complete: ${report.summary.total_duplicate_groups} groups, ${report.summary.total_wasted_space_formatted} wasted`);
+    res.json({
+      status: 'success',
+      message: 'Dedup scan complete',
+      data: { report_id: reportId, summary: report.summary }
+    });
+  } catch (err) {
+    log(`Dedup scan failed: ${err.message}`, 'error');
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/**
+ * GET /dedup-report — return the latest (or specific) dedup report.
+ * Query: ?report_id=<id> (optional — defaults to latest)
+ */
+router.get('/dedup-report', async (req, res) => {
+  const db = req.app.locals.db;
+  if (!db) return res.status(503).json({ status: 'error', message: 'Database not ready' });
+
+  try {
+    const report = await dedupScanner.getReport(db, req.query.report_id || null);
+    if (!report) return res.status(404).json({ status: 'error', message: 'No dedup report found' });
+    res.json({ status: 'success', data: report });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/**
+ * POST /dedup-approve — approve deletions from a dedup report.
+ * Body: { report_id, files: [path, ...], confirmation_token, dry_run? }
+ * Safety: dry_run defaults to true, keys/ always excluded.
+ */
+router.post('/dedup-approve', async (req, res) => {
+  const db = req.app.locals.db;
+  if (!db) return res.status(503).json({ status: 'error', message: 'Database not ready' });
+
+  const { report_id, files, confirmation_token, dry_run } = req.body;
+  if (!report_id) return res.status(400).json({ status: 'error', message: 'report_id required' });
+  if (!files || !Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ status: 'error', message: 'files array required' });
+  }
+  if (!confirmation_token) return res.status(400).json({ status: 'error', message: 'confirmation_token required' });
+
+  const isDryRun = dry_run !== false;
+  try {
+    const result = await dedupScanner.executeApprovedDeletions(db, files, confirmation_token, report_id, isDryRun);
+    if (!result.ok) return res.status(403).json({ status: 'error', message: result.error, expected_token: result.expected_token });
+
+    const verb = isDryRun ? 'Would delete' : 'Deleted';
+    log(`Dedup approve: ${verb} ${result.deleted.length} files, freed ${result.space_freed_formatted}`);
+    res.json({
+      status: 'success',
+      message: isDryRun ? 'Dry run — no files deleted.' : 'Approved files deleted.',
+      data: result
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
 });
 
 module.exports = router;
