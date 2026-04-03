@@ -4,6 +4,7 @@
  */
 const janitorService = require('../services/janitorService');
 const dedupScanner = require('../services/dedupScanner');
+const janitorAI = require('../services/janitorAI');
 const { log } = require('../utils/logger');
 
 /** POST /analyze */
@@ -148,4 +149,21 @@ async function dedupApprove(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { analyze, suggest, execute, listPolicies, dedupScan, dedupReport, dedupApprove };
+/** POST /ai */
+async function aiChat(req, res) {
+  const { action, context } = req.body;
+  if (!action) return res.status(400).json({ status: 'error', message: 'action required' });
+  if (!janitorAI.ACTIONS[action]) {
+    return res.status(400).json({ status: 'error', message: `Invalid action: ${action}. Valid: ${Object.keys(janitorAI.ACTIONS).join(', ')}` });
+  }
+
+  try {
+    const result = await janitorAI.callAI(action, context || {});
+    res.json({ status: 'success', data: result });
+  } catch (err) {
+    log(`Janitor AI failed: ${err.message}`, 'error');
+    res.status(503).json({ status: 'error', message: 'AI service unavailable — Ollama may be offline' });
+  }
+}
+
+module.exports = { analyze, suggest, execute, listPolicies, dedupScan, dedupReport, dedupApprove, aiChat };

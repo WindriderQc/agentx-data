@@ -4,6 +4,11 @@
 const request = require('supertest');
 const express = require('express');
 
+jest.mock('../../services/janitorAI', () => ({
+  callAI: jest.fn(),
+  ACTIONS: { triage: {}, resolve_duplicates: {}, analyze_path: {}, chat: {} }
+}));
+
 jest.mock('../../services/janitorService', () => {
   const actual = jest.requireActual('../../services/janitorService');
   return {
@@ -16,6 +21,7 @@ jest.mock('../../services/janitorService', () => {
 });
 
 const janitorService = require('../../services/janitorService');
+const janitorAI = require('../../services/janitorAI');
 const janitorRoutes = require('../../routes/janitor.routes');
 
 function buildApp() {
@@ -97,5 +103,51 @@ describe('GET /api/v1/janitor/policies', () => {
     const res = await request(buildApp()).get('/api/v1/janitor/policies');
     expect(res.status).toBe(200);
     expect(res.body.data.policies.length).toBeGreaterThan(0);
+  });
+});
+
+describe('POST /api/v1/janitor/ai', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns 400 when action is missing', async () => {
+    const res = await request(buildApp()).post('/api/v1/janitor/ai').send({});
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/action required/);
+  });
+
+  test('returns 400 for unknown action', async () => {
+    const res = await request(buildApp()).post('/api/v1/janitor/ai').send({ action: 'hack' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/Invalid action/);
+  });
+
+  test('calls AI and returns result', async () => {
+    janitorAI.callAI.mockResolvedValue({
+      action: 'chat',
+      result: { text: 'Your storage looks healthy.' },
+      model: 'qwen2.5:7b',
+      duration_ms: 500
+    });
+
+    const res = await request(buildApp()).post('/api/v1/janitor/ai').send({
+      action: 'chat',
+      context: { message: 'how is my storage?' }
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.result.text).toContain('healthy');
+    expect(janitorAI.callAI).toHaveBeenCalledWith('chat', { message: 'how is my storage?' });
+  });
+
+  test('returns 503 when Ollama is unreachable', async () => {
+    janitorAI.callAI.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    const res = await request(buildApp()).post('/api/v1/janitor/ai').send({
+      action: 'chat',
+      context: { message: 'hello' }
+    });
+
+    expect(res.status).toBe(503);
+    expect(res.body.message).toMatch(/AI service unavailable/);
   });
 });

@@ -11,5 +11,6 @@ router.get('/policies',       janitorController.listPolicies);
 router.post('/dedup-scan',    janitorController.dedupScan);
 router.get('/dedup-report',   janitorController.dedupReport);
 router.post('/dedup-approve', janitorController.dedupApprove);
+router.post('/ai',            janitorController.aiChat);
 
 module.exports = router;
