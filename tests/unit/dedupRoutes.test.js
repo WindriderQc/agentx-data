@@ -22,6 +22,10 @@ function buildApp(db) {
   app.use(express.json());
   app.locals.db = db;
   app.use('/api/v1/janitor', janitorRoutes);
+  // Error handler for next(err) in controller
+  app.use((err, req, res, _next) => {
+    res.status(500).json({ status: 'error', message: err.message });
+  });
   return app;
 }
 
@@ -57,13 +61,13 @@ describe('POST /api/v1/janitor/dedup-scan', () => {
 
     const app = buildApp(mockDb);
     await request(app).post('/api/v1/janitor/dedup-scan').send({
-      root_path: '/mnt/other/',
+      root_path: '/mnt/datalake/subdir/',
       extensions: ['pdf', 'docx'],
       max_depth: 5
     });
 
     expect(dedupScanner.buildDedupReport).toHaveBeenCalledWith(mockDb, {
-      rootPath: '/mnt/other/',
+      rootPath: '/mnt/datalake/subdir/',
       extensions: ['pdf', 'docx'],
       maxDepth: 5
     });
@@ -177,9 +181,9 @@ describe('POST /api/v1/janitor/dedup-approve', () => {
     );
   });
 
-  test('returns 403 on invalid token', async () => {
+  test('returns 403 on invalid token without leaking expected token', async () => {
     dedupScanner.executeApprovedDeletions.mockResolvedValue({
-      ok: false, error: 'Invalid confirmation token', expected_token: 'abc123'
+      ok: false, error: 'Invalid confirmation token'
     });
 
     const app = buildApp(mockDb);
@@ -189,6 +193,7 @@ describe('POST /api/v1/janitor/dedup-approve', () => {
 
     expect(res.status).toBe(403);
     expect(res.body.message).toMatch(/Invalid/);
+    expect(res.body.expected_token).toBeUndefined();
   });
 
   test('returns 503 if DB not ready', async () => {

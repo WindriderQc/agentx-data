@@ -176,11 +176,24 @@ describe('getReport', () => {
 // ── executeApprovedDeletions ────────────────────────────────
 
 describe('executeApprovedDeletions', () => {
-  test('rejects invalid confirmation token', async () => {
+  test('rejects invalid confirmation token without leaking expected token', async () => {
     const db = mockDb();
     const result = await executeApprovedDeletions(db, ['/a.txt'], 'bad-token', 'r1', true);
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/Invalid confirmation token/);
+    expect(result.expected_token).toBeUndefined();
+  });
+
+  test('rejects paths outside allowed roots', async () => {
+    const files = ['/etc/shadow'];
+    const token = generateConfirmationToken(files, 'r1');
+    const db = mockDb();
+
+    const result = await executeApprovedDeletions(db, files, token, 'r1', true);
+    expect(result.ok).toBe(true);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].reason).toMatch(/safety policy/i);
+    expect(result.deleted).toHaveLength(0);
   });
 
   test('skips protected paths even with valid token', async () => {

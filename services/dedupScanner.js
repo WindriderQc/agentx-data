@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { formatFileSize } = require('../utils/file-operations');
+const { validatePath } = require('./janitorService');
 
 /** Paths that must never appear in deletion lists */
 const PROTECTED_PATTERNS = ['/keys/', '/keys'];
@@ -164,7 +165,7 @@ function generateConfirmationToken(filePaths, reportId) {
 async function executeApprovedDeletions(db, filePaths, token, reportId, dryRun = true) {
   const expectedToken = generateConfirmationToken(filePaths, reportId);
   if (token !== expectedToken) {
-    return { ok: false, error: 'Invalid confirmation token', expected_token: expectedToken };
+    return { ok: false, error: 'Invalid confirmation token' };
   }
 
   const fs = require('fs/promises');
@@ -180,6 +181,10 @@ async function executeApprovedDeletions(db, filePaths, token, reportId, dryRun =
   for (const fp of filePaths) {
     if (isProtectedPath(fp)) {
       results.skipped.push({ path: fp, reason: 'Protected path (keys/)' });
+      continue;
+    }
+    if (!validatePath(fp)) {
+      results.failed.push({ path: fp, reason: 'Blocked by safety policy' });
       continue;
     }
 
