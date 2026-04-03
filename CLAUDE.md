@@ -128,8 +128,11 @@ Live directory analysis — hash files, find dupes, suggest + execute cleanup.
 |----------|--------|-------------|
 | `/api/v1/janitor/analyze` | POST | Analyze a directory (hash, dedup) |
 | `/api/v1/janitor/suggest` | POST | Generate cleanup suggestions by policy |
-| `/api/v1/janitor/execute` | POST | Execute cleanup (dry_run default, safety blocklist) |
+| `/api/v1/janitor/execute` | POST | Execute cleanup (dry_run default, safety allowlist) |
 | `/api/v1/janitor/policies` | GET | List available cleanup policies |
+| `/api/v1/janitor/dedup-scan` | POST | Run dedup analysis across NAS (persists to `dedup_reports`) |
+| `/api/v1/janitor/dedup-report` | GET | Get latest (or specific) dedup report |
+| `/api/v1/janitor/dedup-approve` | POST | Approve deletions (requires confirmation token, dry-run default) |
 
 ### Integrations
 Webhook sink for n8n, ClickUp, and generic sources.
@@ -164,6 +167,7 @@ Utility module — not a route, but available for creating instant CRUD endpoint
 | `pressures` | Weather pressure readings |
 | `weatherLocations` | Registered weather tracking locations |
 | `integration_events` | Webhook event inbox (n8n, ClickUp, etc.) |
+| `dedup_reports` | Persistent dedup analysis reports (groups, summaries) |
 
 ## Directory Structure
 
@@ -180,12 +184,13 @@ data/
 │   ├── events.routes.js        # Event feed + SSE
 │   ├── databases.routes.js     # Database browser
 │   ├── exports.routes.js       # File export reports
-│   ├── janitor.routes.js       # Disk analyzer + cleanup
+│   ├── janitor.routes.js       # Disk janitor + dedup (thin delegation)
 │   ├── integrations.routes.js  # Webhook sinks
 │   └── system.routes.js        # System resources
 ├── controllers/
 │   ├── storageController.js
 │   ├── fileBrowserController.js
+│   ├── janitorController.js    # Disk janitor + dedup HTTP handlers
 │   ├── networkController.js
 │   ├── liveDataController.js
 │   ├── eventController.js
@@ -194,11 +199,19 @@ data/
 │   └── systemController.js
 ├── services/
 │   ├── scanner.js              # File scanner (EventEmitter, SHA256)
+│   ├── janitorService.js       # Disk janitor: analysis, suggestions, cleanup
+│   ├── dedupScanner.js         # Dedup report pipeline (NAS-wide)
 │   ├── networkScanner.js       # nmap wrapper
 │   ├── liveData.js             # Background fetcher orchestrator
 │   └── mqttClient.js           # MQTT pub/sub (optional)
 ├── middleware/
 │   └── errorHandler.js
+├── tests/
+│   └── unit/
+│       ├── janitorService.test.js
+│       ├── janitorRoutes.test.js
+│       ├── dedupScanner.test.js
+│       └── dedupRoutes.test.js
 └── utils/
     ├── errors.js
     ├── eventEmitter.js         # Shared pub/sub bus
