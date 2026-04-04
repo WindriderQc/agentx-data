@@ -125,7 +125,9 @@ describe('generateCleanupToken', () => {
 describe('executeCleanup', () => {
   test('dry run reports would_delete without unlinking', async () => {
     const origStat = fsMod.stat;
-    fsMod.stat = jest.fn().mockResolvedValue({ size: 1024 });
+    const origRealpath = fsMod.realpath;
+    fsMod.stat = jest.fn().mockResolvedValue({ size: 1024, isFile: () => true });
+    fsMod.realpath = jest.fn().mockImplementation(async (value) => value);
     const files = ['/mnt/datalake/photos/dup.jpg'];
     const token = generateCleanupToken(files);
     const result = await executeCleanup(files, token, true);
@@ -135,6 +137,7 @@ describe('executeCleanup', () => {
     expect(result.deleted[0].action).toBe('would_delete');
     expect(result.space_freed).toBe(1024);
     fsMod.stat = origStat;
+    fsMod.realpath = origRealpath;
   });
 
   test('rejects invalid confirmation token', async () => {
@@ -156,10 +159,12 @@ describe('executeCleanup', () => {
   test('handles per-file errors without aborting batch', async () => {
     const origStat = fsMod.stat;
     const origUnlink = fsMod.unlink;
+    const origRealpath = fsMod.realpath;
     fsMod.stat = jest.fn()
-      .mockResolvedValueOnce({ size: 100 })
+      .mockResolvedValueOnce({ size: 100, isFile: () => true })
       .mockRejectedValueOnce(new Error('ENOENT'));
     fsMod.unlink = jest.fn().mockResolvedValue(undefined);
+    fsMod.realpath = jest.fn().mockImplementation(async (value) => value);
     const files = ['/mnt/datalake/good.txt', '/mnt/datalake/gone.txt'];
     const token = generateCleanupToken(files);
     const result = await executeCleanup(files, token, false);
@@ -168,6 +173,7 @@ describe('executeCleanup', () => {
     expect(result.failed).toHaveLength(1);
     fsMod.stat = origStat;
     fsMod.unlink = origUnlink;
+    fsMod.realpath = origRealpath;
   });
 });
 
@@ -176,16 +182,18 @@ describe('executeCleanup', () => {
 describe('analyzeDirectory', () => {
   test('returns analysis with duplicate groups', async () => {
     const origReaddir = fsMod.readdir;
+    const origRealpath = fsMod.realpath;
     const origStat = fsMod.stat;
     const origCreateReadStream = fsSync.createReadStream;
 
     const entries = [
-      { name: 'a.txt', isDirectory: () => false, isFile: () => true },
-      { name: 'b.txt', isDirectory: () => false, isFile: () => true },
-      { name: 'c.txt', isDirectory: () => false, isFile: () => true }
+      { name: 'a.txt', isDirectory: () => false, isFile: () => true, isSymbolicLink: () => false },
+      { name: 'b.txt', isDirectory: () => false, isFile: () => true, isSymbolicLink: () => false },
+      { name: 'c.txt', isDirectory: () => false, isFile: () => true, isSymbolicLink: () => false }
     ];
 
     fsMod.readdir = jest.fn().mockResolvedValue(entries);
+    fsMod.realpath = jest.fn().mockImplementation(async (value) => value);
     fsMod.stat = jest.fn().mockResolvedValue({ size: 100, mtime: new Date('2025-01-01') });
 
     const { PassThrough } = require('stream');
@@ -204,17 +212,20 @@ describe('analyzeDirectory', () => {
     expect(result.duplicate_groups[0].wasted).toBe(200);
 
     fsMod.readdir = origReaddir;
+    fsMod.realpath = origRealpath;
     fsMod.stat = origStat;
     fsSync.createReadStream = origCreateReadStream;
   });
 
   test('skips files larger than MAX_HASH_SIZE for hashing', async () => {
     const origReaddir = fsMod.readdir;
+    const origRealpath = fsMod.realpath;
     const origStat = fsMod.stat;
 
     fsMod.readdir = jest.fn().mockResolvedValue([
-      { name: 'big.bin', isDirectory: () => false, isFile: () => true }
+      { name: 'big.bin', isDirectory: () => false, isFile: () => true, isSymbolicLink: () => false }
     ]);
+    fsMod.realpath = jest.fn().mockImplementation(async (value) => value);
     fsMod.stat = jest.fn().mockResolvedValue({ size: 200 * 1024 * 1024, mtime: new Date() });
 
     const result = await analyzeDirectory('/mnt/datalake/test');
@@ -223,6 +234,7 @@ describe('analyzeDirectory', () => {
     expect(result.scanned_files).toBe(0);
 
     fsMod.readdir = origReaddir;
+    fsMod.realpath = origRealpath;
     fsMod.stat = origStat;
   });
 });

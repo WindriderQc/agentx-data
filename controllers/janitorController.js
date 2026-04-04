@@ -11,11 +11,13 @@ const { log } = require('../utils/logger');
 async function analyze(req, res, next) {
   const { path: scanPath } = req.body;
   if (!scanPath) return res.status(400).json({ status: 'error', message: 'path required' });
-  if (!janitorService.validatePath(scanPath)) {
-    return res.status(403).json({ status: 'error', message: 'Path blocked by safety policy' });
-  }
   try {
-    const result = await janitorService.analyzeDirectory(scanPath);
+    const safePath = await janitorService.resolveAllowedPath(scanPath, { mustExist: true, type: 'directory' });
+    if (!safePath.ok) {
+      return res.status(safePath.reason === 'Blocked by safety policy' ? 403 : 400)
+        .json({ status: 'error', message: safePath.reason });
+    }
+    const result = await janitorService.analyzeDirectory(safePath.realPath);
     delete result._fileMap;
     res.json({ status: 'success', data: result });
   } catch (err) { next(err); }
@@ -25,11 +27,13 @@ async function analyze(req, res, next) {
 async function suggest(req, res, next) {
   const { path: scanPath, policies } = req.body;
   if (!scanPath) return res.status(400).json({ status: 'error', message: 'path required' });
-  if (!janitorService.validatePath(scanPath)) {
-    return res.status(403).json({ status: 'error', message: 'Path blocked by safety policy' });
-  }
   try {
-    const analysis = await janitorService.analyzeDirectory(scanPath);
+    const safePath = await janitorService.resolveAllowedPath(scanPath, { mustExist: true, type: 'directory' });
+    if (!safePath.ok) {
+      return res.status(safePath.reason === 'Blocked by safety policy' ? 403 : 400)
+        .json({ status: 'error', message: safePath.reason });
+    }
+    const analysis = await janitorService.analyzeDirectory(safePath.realPath);
     const active = policies || Object.keys(janitorService.POLICIES).filter(k => janitorService.POLICIES[k].enabled);
     const suggestions = janitorService.buildSuggestions(analysis, active);
     const totalSaved = suggestions.reduce((s, x) => s + (x.space_saved || 0), 0);
@@ -85,13 +89,14 @@ async function dedupScan(req, res, next) {
   const { root_path, extensions, max_depth } = req.body;
   const rootPath = root_path || '/mnt/datalake/';
 
-  if (!janitorService.validatePath(rootPath)) {
-    return res.status(403).json({ status: 'error', message: 'Path blocked by safety policy' });
-  }
-
   try {
+    const safePath = await janitorService.resolveAllowedPath(rootPath, { mustExist: true, type: 'directory' });
+    if (!safePath.ok) {
+      return res.status(safePath.reason === 'Blocked by safety policy' ? 403 : 400)
+        .json({ status: 'error', message: safePath.reason });
+    }
     const report = await dedupScanner.buildDedupReport(db, {
-      rootPath,
+      rootPath: safePath.realPath,
       extensions: extensions || [],
       maxDepth: max_depth || null
     });

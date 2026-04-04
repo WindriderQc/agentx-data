@@ -1,5 +1,6 @@
 const { Scanner } = require('../services/scanner');
 const { ObjectId } = require('mongodb');
+const { resolveAllowedPath } = require('../services/janitorService');
 
 // Track running scans so they can be stopped
 const runningScans = new Map();
@@ -31,13 +32,28 @@ const scan = async (req, res) => {
     const { roots, extensions, exclude_extensions, batch_size, compute_hashes, hash_max_size } = req.body;
     const db = req.app.locals.db;
     const scan_id = new ObjectId().toHexString();
+    const requestedRoots = Array.isArray(roots) ? roots : [];
+
+    if (requestedRoots.length === 0) {
+      return res.status(400).json({ status: 'error', message: 'roots must be a non-empty array' });
+    }
+
+    const safeRoots = [];
+    for (const root of requestedRoots) {
+      const safePath = await resolveAllowedPath(root, { mustExist: true, type: 'directory' });
+      if (!safePath.ok) {
+        return res.status(safePath.reason === 'Blocked by safety policy' ? 403 : 400)
+          .json({ status: 'error', message: `Invalid scan root "${root}": ${safePath.reason}` });
+      }
+      safeRoots.push(safePath.realPath);
+    }
 
     const scanner = new Scanner(db);
     runningScans.set(scan_id, scanner);
     scanner.on('done', () => runningScans.delete(scan_id));
 
     scanner.run({
-      roots,
+      roots: safeRoots,
       includeExt: extensions,
       excludeExt: exclude_extensions,
       batchSize: batch_size || 1000,
@@ -52,7 +68,7 @@ const scan = async (req, res) => {
     res.json({
       status: 'success',
       message: 'Scan started successfully',
-      data: { scan_id, roots, extensions, exclude_extensions, batch_size: batch_size || 1000 }
+      data: { scan_id, roots: safeRoots, extensions, exclude_extensions, batch_size: batch_size || 1000 }
     });
   } catch (error) {
     console.error('Error starting scan:', error);

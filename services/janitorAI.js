@@ -1,14 +1,12 @@
 /**
  * janitorAI.js — Ollama integration for the janitor dashboard.
- * Builds prompts, asks core scheduler for advisory placement when available,
- * then falls back to the existing lightweight host.
+ * Builds prompts and routes them through Core by task type so the service
+ * does not duplicate model or host selection logic locally.
  */
 const { fetchWithTimeoutAndRetry } = require('../utils/fetch-utils');
 const { log } = require('../utils/logger');
 
 const CORE_PROXY_URL = (process.env.CORE_PROXY_URL || 'http://localhost:3080').replace(/\/+$/, '');
-const JANITOR_MODEL = process.env.JANITOR_AI_MODEL || 'qwen2.5:7b';
-const CORE_SCHEDULER_URL = process.env.CORE_SCHEDULER_URL || 'http://localhost:3080';
 
 const ACTIONS = {
   triage: {
@@ -46,7 +44,7 @@ function buildPrompt(action, context = {}) {
       break;
   }
 
-  return { model: JANITOR_MODEL, system: actionDef.system, prompt, stream: false };
+  return { taskType: 'janitor_ai', system: actionDef.system, prompt, stream: false };
 }
 
 function parseAIResponse(raw) {
@@ -65,69 +63,9 @@ function parseAIResponse(raw) {
   return { text: raw };
 }
 
-async function resolveJanitorTarget(model = JANITOR_MODEL) {
-  const fallback = {
-    source: 'fallback',
-    url: CORE_PROXY_URL,
-    host: 'tertiary',
-    claimId: null
-  };
-
-  try {
-    const recommendUrl = new URL('/api/cluster/schedule/recommend', CORE_SCHEDULER_URL);
-    recommendUrl.searchParams.set('model', model);
-    recommendUrl.searchParams.set('durationMs', '60000');
-    recommendUrl.searchParams.set('caller', 'janitor-ai');
-
-    const recommendRes = await fetchWithTimeoutAndRetry(recommendUrl.toString(), {
-      method: 'GET',
-      timeout: 4000,
-      retries: 0,
-      name: 'janitor-scheduler-recommend'
-    });
-    const recommendJson = await recommendRes.json();
-    const recommendation = recommendJson?.data?.recommendation;
-    if (!recommendation?.hostUrl || !recommendation?.host) {
-      return fallback;
-    }
-
-    let claimId = null;
-    try {
-      const claimRes = await fetchWithTimeoutAndRetry(new URL('/api/cluster/schedule/claim', CORE_SCHEDULER_URL).toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          host: recommendation.host,
-          model,
-          caller: 'janitor-ai',
-          ttlMs: 60000
-        }),
-        timeout: 4000,
-        retries: 0,
-        name: 'janitor-scheduler-claim'
-      });
-      const claimJson = await claimRes.json();
-      claimId = claimJson?.data?.claimId || null;
-    } catch (claimError) {
-      log(`Janitor AI scheduler claim skipped: ${claimError.message}`, 'warn');
-    }
-
-    return {
-      source: 'scheduler',
-      url: recommendation.hostUrl,
-      host: recommendation.host,
-      claimId
-    };
-  } catch (error) {
-    log(`Janitor AI scheduler lookup failed, using fallback: ${error.message}`, 'warn');
-    return fallback;
-  }
-}
-
 async function callAI(action, context = {}) {
   const payload = buildPrompt(action, context);
   const start = Date.now();
-  const target = await resolveJanitorTarget(payload.model);
 
   const res = await fetchWithTimeoutAndRetry(`${CORE_PROXY_URL}/api/inference/generate`, {
     method: 'POST',
@@ -141,14 +79,19 @@ async function callAI(action, context = {}) {
   const data = await res.json();
   const raw = data.response || '';
   const result = parseAIResponse(raw);
+  const resolvedModel = typeof res.headers?.get === 'function' ? res.headers.get('x-resolved-model') : null;
+  const routedHost = typeof res.headers?.get === 'function' ? res.headers.get('x-routed-host') : null;
+  const routedHostKey = typeof res.headers?.get === 'function' ? res.headers.get('x-routed-host-key') : null;
+  const routingSource = typeof res.headers?.get === 'function' ? res.headers.get('x-routing-source') : null;
 
   log(`Janitor AI [${action}] completed in ${Date.now() - start}ms`, 'info');
 
   return {
     action,
     result,
-    model: JANITOR_MODEL,
-    target: { url: target.url, host: target.host, source: target.source, claimId: target.claimId },
+    taskType: payload.taskType,
+    model: resolvedModel,
+    target: { url: routedHost, host: routedHostKey, source: routingSource },
     duration_ms: Date.now() - start
   };
 }
@@ -157,8 +100,6 @@ module.exports = {
   ACTIONS,
   buildPrompt,
   parseAIResponse,
-  resolveJanitorTarget,
   callAI,
-  JANITOR_MODEL,
-  CORE_SCHEDULER_URL
+  CORE_PROXY_URL
 };

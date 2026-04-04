@@ -6,8 +6,7 @@ jest.mock('../../utils/logger', () => ({
   log: jest.fn()
 }));
 
-const { fetchWithTimeoutAndRetry } = require('../../utils/fetch-utils');
-const { buildPrompt, parseAIResponse, resolveJanitorTarget, ACTIONS } = require('../../services/janitorAI');
+const { buildPrompt, parseAIResponse, ACTIONS } = require('../../services/janitorAI');
 
 describe('ACTIONS', () => {
   test('defines all four action types', () => {
@@ -32,7 +31,7 @@ describe('ACTIONS', () => {
 describe('buildPrompt', () => {
   test('returns model, system, and prompt fields', () => {
     const result = buildPrompt('chat', { message: 'hello' });
-    expect(result).toHaveProperty('model', 'qwen2.5:7b');
+    expect(result).toHaveProperty('taskType', 'janitor_ai');
     expect(result).toHaveProperty('system');
     expect(result).toHaveProperty('prompt');
     expect(result.prompt).toContain('hello');
@@ -82,49 +81,5 @@ describe('parseAIResponse', () => {
     const raw = 'I recommend keeping all files.';
     const result = parseAIResponse(raw);
     expect(result).toEqual({ text: raw });
-  });
-});
-
-describe('resolveJanitorTarget', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  test('prefers scheduler advice when core responds', async () => {
-    fetchWithTimeoutAndRetry
-      .mockResolvedValueOnce({
-        json: async () => ({
-          status: 'success',
-          data: { recommendation: { host: 'secondary', hostUrl: 'http://secondary:11434' } }
-        })
-      })
-      .mockResolvedValueOnce({
-        json: async () => ({
-          status: 'success',
-          data: { claimId: 'janitor-claim-1' }
-        })
-      });
-
-    const result = await resolveJanitorTarget('qwen2.5:7b');
-
-    expect(result).toEqual({
-      source: 'scheduler',
-      url: 'http://secondary:11434',
-      host: 'secondary',
-      claimId: 'janitor-claim-1'
-    });
-  });
-
-  test('falls back to local default when scheduler lookup fails', async () => {
-    fetchWithTimeoutAndRetry.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
-
-    const result = await resolveJanitorTarget('qwen2.5:7b');
-
-    expect(result).toEqual({
-      source: 'fallback',
-      url: 'http://192.168.2.99:11434',
-      host: 'tertiary',
-      claimId: null
-    });
   });
 });

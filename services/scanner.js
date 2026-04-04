@@ -39,6 +39,7 @@ class Scanner extends EventEmitter {
 
     let counts = { files_seen: 0, upserts: 0, skipped: 0, errors: 0, batches: 0, hashed: 0 };
     let batch = [];
+    const visitedDirs = new Set();
 
     const updateScan = async (patch) => {
       await scansCol.updateOne({ _id: opts.scanId }, { $set: patch }, { upsert: true });
@@ -75,6 +76,21 @@ class Scanner extends EventEmitter {
     const stack = [...opts.roots];
     while (stack.length && !this.stopFlag) {
       const dir = stack.pop();
+      let realDir;
+      try {
+        realDir = await fs.realpath(dir);
+      } catch (e) {
+        counts.errors++;
+        await updateScan({ counts, last_error: `realpath ${dir}: ${e}` });
+        continue;
+      }
+
+      if (visitedDirs.has(realDir)) {
+        counts.skipped++;
+        continue;
+      }
+      visitedDirs.add(realDir);
+
       let entries;
       try {
         entries = await fs.readdir(dir, { withFileTypes: true });
@@ -87,6 +103,7 @@ class Scanner extends EventEmitter {
       for (const ent of entries) {
         if (this.stopFlag) break;
         const p = path.join(dir, ent.name);
+        if (ent.isSymbolicLink()) { counts.skipped++; continue; }
         if (ent.isDirectory()) { stack.push(p); continue; }
         if (!ent.isFile()) continue;
 

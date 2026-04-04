@@ -65,6 +65,60 @@ function validatePath(p) {
   );
 }
 
+/**
+ * Resolve a path through the filesystem and verify the real target remains
+ * under an allowed root. For missing paths, callers can require existence.
+ *
+ * @param {*} p - Path to resolve
+ * @param {Object} [options]
+ * @param {boolean} [options.mustExist=false] - require the path to exist
+ * @param {'file'|'directory'} [options.type] - expected target type when it exists
+ * @returns {Promise<{ok: boolean, path?: string, realPath?: string, reason?: string}>}
+ */
+async function resolveAllowedPath(p, options = {}) {
+  const { mustExist = false, type } = options;
+  if (!p || typeof p !== 'string') {
+    return { ok: false, reason: 'Invalid path' };
+  }
+
+  const inputPath = path.resolve(p);
+  let realPath = inputPath;
+
+  try {
+    realPath = await fs.realpath(inputPath);
+  } catch (err) {
+    if (mustExist) {
+      return {
+        ok: false,
+        reason: err?.code === 'ENOENT' ? 'Path not found' : `Unable to resolve path: ${err.message}`
+      };
+    }
+  }
+
+  if (!validatePath(realPath)) {
+    return { ok: false, reason: 'Blocked by safety policy' };
+  }
+
+  if (mustExist && type) {
+    try {
+      const stats = await fs.stat(realPath);
+      if (type === 'directory' && !stats.isDirectory()) {
+        return { ok: false, reason: 'Path must be a directory' };
+      }
+      if (type === 'file' && !stats.isFile()) {
+        return { ok: false, reason: 'Path must be a file' };
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        reason: err?.code === 'ENOENT' ? 'Path not found' : `Unable to stat path: ${err.message}`
+      };
+    }
+  }
+
+  return { ok: true, path: inputPath, realPath };
+}
+
 // ── Directory analysis ─────────────────────────────────────────
 /**
  * Analyze a directory: hash files, find duplicates.
@@ -73,9 +127,16 @@ function validatePath(p) {
 async function analyzeDirectory(dirPath) {
   const fileMap = new Map();
   let totalFiles = 0, totalSize = 0, scannedFiles = 0;
+  const visitedDirs = new Set();
 
   async function scan(dir) {
     if (totalFiles >= MAX_SCAN_FILES) return;
+    let realDir;
+    try { realDir = await fs.realpath(dir); }
+    catch { return; }
+    if (visitedDirs.has(realDir)) return;
+    visitedDirs.add(realDir);
+
     let entries;
     try { entries = await fs.readdir(dir, { withFileTypes: true }); }
     catch { return; }
@@ -83,6 +144,7 @@ async function analyzeDirectory(dirPath) {
     for (const entry of entries) {
       if (totalFiles >= MAX_SCAN_FILES) break;
       const fullPath = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) { await scan(fullPath); continue; }
       if (!entry.isFile()) continue;
 
@@ -243,6 +305,7 @@ async function executeCleanup(filePaths, token, dryRun) {
 
 module.exports = {
   validatePath,
+  resolveAllowedPath,
   ALLOWED_ROOTS,
   POLICIES,
   MAX_SCAN_FILES,

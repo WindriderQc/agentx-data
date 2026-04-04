@@ -212,7 +212,9 @@ describe('executeApprovedDeletions', () => {
     // Mock fs.stat to return a size
     const fsMock = require('fs/promises');
     const origStat = fsMock.stat;
-    fsMock.stat = jest.fn().mockResolvedValue({ size: 4096 });
+    const origRealpath = fsMock.realpath;
+    fsMock.stat = jest.fn().mockResolvedValue({ size: 4096, isFile: () => true });
+    fsMock.realpath = jest.fn().mockImplementation(async (value) => value);
 
     const files = ['/mnt/datalake/photos/dup1.jpg'];
     const token = generateConfirmationToken(files, 'r1');
@@ -226,14 +228,17 @@ describe('executeApprovedDeletions', () => {
     expect(result.space_freed).toBe(4096);
 
     fsMock.stat = origStat;
+    fsMock.realpath = origRealpath;
   });
 
   test('real delete removes file and updates nas_files', async () => {
     const fsMock = require('fs/promises');
     const origStat = fsMock.stat;
     const origUnlink = fsMock.unlink;
-    fsMock.stat = jest.fn().mockResolvedValue({ size: 2048 });
+    const origRealpath = fsMock.realpath;
+    fsMock.stat = jest.fn().mockResolvedValue({ size: 2048, isFile: () => true });
     fsMock.unlink = jest.fn().mockResolvedValue(undefined);
+    fsMock.realpath = jest.fn().mockImplementation(async (value) => value);
 
     const nasFiles = mockCollection();
     const db = mockDb({ nas_files: nasFiles });
@@ -251,5 +256,6 @@ describe('executeApprovedDeletions', () => {
 
     fsMock.stat = origStat;
     fsMock.unlink = origUnlink;
+    fsMock.realpath = origRealpath;
   });
 });

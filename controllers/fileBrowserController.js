@@ -1,5 +1,6 @@
 const path = require('path');
 const { formatFileSize } = require('../utils/file-operations');
+const { resolveAllowedPath } = require('../services/janitorService');
 
 class FileBrowserController {
   static async browseFiles(req, res, next) {
@@ -313,6 +314,16 @@ class FileBrowserController {
       if (!record) return res.status(404).json({ status: 'error', message: 'Pending deletion not found or already processed' });
 
       try {
+        const safePath = await resolveAllowedPath(record.path, { mustExist: true, type: 'file' });
+        if (!safePath.ok) {
+          await db.collection('nas_pending_deletions').updateOne(
+            { _id: record._id },
+            { $set: { status: 'failed', error: safePath.reason } }
+          );
+          return res.status(safePath.reason === 'Blocked by safety policy' ? 403 : 400)
+            .json({ status: 'error', message: safePath.reason, data: { path: record.path } });
+        }
+
         await fs.unlink(record.path);
         await db.collection('nas_pending_deletions').updateOne({ _id: record._id }, { $set: { status: 'completed', deleted_at: new Date(), deleted_by: 'api' } });
         await db.collection('nas_files').deleteOne({ path: record.path });

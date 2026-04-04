@@ -5,6 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const { MongoClient } = require('mongodb');
 const { log } = require('./utils/logger');
+const { ensureIndexes } = require('./utils/indexes');
 const errorHandler = require('./middleware/errorHandler');
 const storageController = require('./controllers/storageController');
 const liveData = require('./services/liveData');
@@ -54,6 +55,8 @@ async function start() {
   const dbName = new URL(MONGODB_URI).pathname.slice(1) || 'agentx';
   const db = client.db(dbName);
   app.locals.db = db;
+
+  await ensureIndexes(db);
 
   // Cleanup stale scans from previous session
   await storageController.cleanupStaleScans(db);

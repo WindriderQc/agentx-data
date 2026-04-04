@@ -16,7 +16,8 @@ jest.mock('../../services/janitorService', () => {
     analyzeDirectory: jest.fn(),
     buildSuggestions: jest.fn(),
     executeCleanup: jest.fn(),
-    generateCleanupToken: jest.fn()
+    generateCleanupToken: jest.fn(),
+    resolveAllowedPath: jest.fn()
   };
 });
 
@@ -43,11 +44,13 @@ describe('POST /api/v1/janitor/analyze', () => {
   });
 
   test('returns 403 for blocked path', async () => {
+    janitorService.resolveAllowedPath.mockResolvedValue({ ok: false, reason: 'Blocked by safety policy' });
     const res = await request(buildApp()).post('/api/v1/janitor/analyze').send({ path: '/etc' });
     expect(res.status).toBe(403);
   });
 
   test('returns analysis data for allowed path', async () => {
+    janitorService.resolveAllowedPath.mockResolvedValue({ ok: true, path: '/mnt/datalake/test', realPath: '/mnt/datalake/test' });
     janitorService.analyzeDirectory.mockResolvedValue({
       path: '/mnt/datalake/test', total_files: 10, scanned_files: 8,
       total_size: 5000, duplicates_count: 2, wasted_space: 1000,

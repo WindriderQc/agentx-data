@@ -5,7 +5,7 @@
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { formatFileSize } = require('../utils/file-operations');
-const { validatePath } = require('./janitorService');
+const { validatePath, resolveAllowedPath } = require('./janitorService');
 
 /** Paths that must never appear in deletion lists */
 const PROTECTED_PATTERNS = ['/keys/', '/keys'];
@@ -189,6 +189,11 @@ async function executeApprovedDeletions(db, filePaths, token, reportId, dryRun =
     }
 
     try {
+      const safePath = await resolveAllowedPath(fp, { mustExist: true, type: 'file' });
+      if (!safePath.ok) {
+        results.failed.push({ path: fp, reason: safePath.reason });
+        continue;
+      }
       const stat = await fs.stat(fp);
       if (dryRun) {
         results.deleted.push({ path: fp, size: stat.size, action: 'would_delete' });

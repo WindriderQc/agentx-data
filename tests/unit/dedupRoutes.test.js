@@ -14,7 +14,16 @@ jest.mock('../../services/dedupScanner', () => ({
   isProtectedPath: jest.fn()
 }));
 
+jest.mock('../../services/janitorService', () => {
+  const actual = jest.requireActual('../../services/janitorService');
+  return {
+    ...actual,
+    resolveAllowedPath: jest.fn()
+  };
+});
+
 const dedupScanner = require('../../services/dedupScanner');
+const janitorService = require('../../services/janitorService');
 const janitorRoutes = require('../../routes/janitor.routes');
 
 function buildApp(db) {
@@ -34,7 +43,14 @@ const mockDb = { collection: jest.fn() };
 // ── POST /dedup-scan ─────────────────────────────────────────
 
 describe('POST /api/v1/janitor/dedup-scan', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    janitorService.resolveAllowedPath.mockResolvedValue({
+      ok: true,
+      path: '/mnt/datalake/',
+      realPath: '/mnt/datalake/'
+    });
+  });
 
   test('triggers scan and returns summary', async () => {
     const summary = { total_duplicate_groups: 3, total_wasted_space: 9000, total_wasted_space_formatted: '8.79 KB' };
@@ -56,6 +72,11 @@ describe('POST /api/v1/janitor/dedup-scan', () => {
   });
 
   test('accepts custom root_path and extensions', async () => {
+    janitorService.resolveAllowedPath.mockResolvedValueOnce({
+      ok: true,
+      path: '/mnt/datalake/subdir/',
+      realPath: '/mnt/datalake/subdir/'
+    });
     dedupScanner.buildDedupReport.mockResolvedValue({ summary: {}, groups: [] });
     dedupScanner.saveReport.mockResolvedValue('r2');
 
@@ -64,6 +85,11 @@ describe('POST /api/v1/janitor/dedup-scan', () => {
       root_path: '/mnt/datalake/subdir/',
       extensions: ['pdf', 'docx'],
       max_depth: 5
+    });
+
+    expect(janitorService.resolveAllowedPath).toHaveBeenCalledWith('/mnt/datalake/subdir/', {
+      mustExist: true,
+      type: 'directory'
     });
 
     expect(dedupScanner.buildDedupReport).toHaveBeenCalledWith(mockDb, {
@@ -77,6 +103,13 @@ describe('POST /api/v1/janitor/dedup-scan', () => {
     const app = buildApp(null);
     const res = await request(app).post('/api/v1/janitor/dedup-scan').send({});
     expect(res.status).toBe(503);
+  });
+
+  test('returns 403 for blocked root_path', async () => {
+    janitorService.resolveAllowedPath.mockResolvedValue({ ok: false, reason: 'Blocked by safety policy' });
+    const app = buildApp(mockDb);
+    const res = await request(app).post('/api/v1/janitor/dedup-scan').send({ root_path: '/etc' });
+    expect(res.status).toBe(403);
   });
 
   test('returns 500 on scan error', async () => {
