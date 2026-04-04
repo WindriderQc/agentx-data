@@ -1,0 +1,328 @@
+<h2>Janitor Command Center — v2</h2>
+<p class="subtitle">More info density, clickable cards, storage breakdown by path</p>
+
+<div class="mockup" style="max-width: 1100px; margin: 0 auto;">
+  <div class="mockup-header">janitor.html — Revised Layout</div>
+  <div class="mockup-body" style="padding: 0; display: flex; min-height: 900px; background: #0d1117;">
+
+    <!-- Main Content Area -->
+    <div style="flex: 1; padding: 20px; overflow-y: auto; font-size: 12px; color: #c9d1d9;">
+
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+        <div>
+          <div style="font-size: 20px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <span style="color: #7cf0ff;">&#9881;</span> Disk Janitor
+          </div>
+          <div style="color: #8b949e; font-size: 11px; margin-top: 2px;">AI-powered storage analysis, deduplication & cleanup</div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <div style="padding: 4px 10px; background: rgba(34,197,94,0.1); border-radius: 6px; color: #22c55e; font-size: 10px;">Last scan: 2h ago</div>
+          <div style="padding: 6px 14px; background: rgba(124,240,255,0.12); border: 1px solid rgba(124,240,255,0.25); border-radius: 8px; color: #7cf0ff; font-size: 11px; font-weight: 600; cursor: pointer;">Analyze Directory</div>
+          <div style="padding: 6px 14px; background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25); border-radius: 8px; color: #22c55e; font-size: 11px; font-weight: 600; cursor: pointer;">Run Dedup Scan</div>
+        </div>
+      </div>
+
+      <!-- Health Metrics Row — Clickable Cards with Sparklines -->
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='rgba(124,240,255,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)'">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-size: 22px; font-weight: 700; color: #fff;">14,832</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Total Files</div>
+            </div>
+            <div style="color: #22c55e; font-size: 10px; font-weight: 600;">+312 &#9650;</div>
+          </div>
+          <div style="margin-top: 8px; display: flex; align-items: flex-end; gap: 2px; height: 20px;">
+            <div style="width: 6px; background: rgba(124,240,255,0.2); border-radius: 2px; height: 8px;"></div>
+            <div style="width: 6px; background: rgba(124,240,255,0.2); border-radius: 2px; height: 12px;"></div>
+            <div style="width: 6px; background: rgba(124,240,255,0.2); border-radius: 2px; height: 10px;"></div>
+            <div style="width: 6px; background: rgba(124,240,255,0.3); border-radius: 2px; height: 14px;"></div>
+            <div style="width: 6px; background: rgba(124,240,255,0.3); border-radius: 2px; height: 16px;"></div>
+            <div style="width: 6px; background: rgba(124,240,255,0.4); border-radius: 2px; height: 20px;"></div>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='rgba(124,240,255,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)'">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-size: 22px; font-weight: 700; color: #fff;">247 GB</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Total Size</div>
+            </div>
+            <div style="color: #f59e0b; font-size: 10px; font-weight: 600;">78% used</div>
+          </div>
+          <div style="margin-top: 8px; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+            <div style="width: 78%; height: 100%; background: linear-gradient(90deg, #22c55e, #f59e0b); border-radius: 3px;"></div>
+          </div>
+        </div>
+
+        <div style="background: rgba(239,68,68,0.04); border: 1px solid rgba(239,68,68,0.15); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='rgba(239,68,68,0.4)'" onmouseout="this.style.borderColor='rgba(239,68,68,0.15)'">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-size: 22px; font-weight: 700; color: #ef4444;">342</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Duplicate Groups</div>
+            </div>
+            <div style="color: #ef4444; font-size: 10px; font-weight: 600;">&#9679; Action</div>
+          </div>
+          <div style="margin-top: 6px; font-size: 10px; color: #8b949e;">1,247 redundant files across 342 hash groups</div>
+        </div>
+
+        <div style="background: rgba(245,158,11,0.04); border: 1px solid rgba(245,158,11,0.15); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='rgba(245,158,11,0.4)'" onmouseout="this.style.borderColor='rgba(245,158,11,0.15)'">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-size: 22px; font-weight: 700; color: #f59e0b;">18.4 GB</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Reclaimable</div>
+            </div>
+            <div style="color: #f59e0b; font-size: 10px; font-weight: 600;">7.4%</div>
+          </div>
+          <div style="margin-top: 6px; font-size: 10px; color: #8b949e;">Dupes: 14.1 GB &bull; Temp: 2.3 GB &bull; Large: 2.0 GB</div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='rgba(124,240,255,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)'">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-size: 22px; font-weight: 700; color: #22c55e;">3 <span style="font-size: 12px; color: #8b949e;">/ 3</span></div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Policies Active</div>
+            </div>
+          </div>
+          <div style="margin-top: 6px; font-size: 10px; color: #8b949e;">Dedup &bull; Temp cleanup &bull; Large flag</div>
+        </div>
+      </div>
+
+      <!-- Storage Breakdown by Path — NEW -->
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <div style="font-size: 14px; font-weight: 600; color: #fff;"><span style="color: #60a5fa;">&#9636;</span> Storage Breakdown</div>
+          <div style="font-size: 10px; color: #8b949e;">Source: /mnt/datalake/ &bull; Click a row to drill down</div>
+        </div>
+
+        <!-- Stacked bar overview -->
+        <div style="height: 28px; display: flex; border-radius: 6px; overflow: hidden; margin-bottom: 14px; gap: 2px;">
+          <div style="width: 36%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff;">photos/ 89GB</div>
+          <div style="width: 28%; background: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff;">backups/ 69GB</div>
+          <div style="width: 15%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff;">projects/ 37GB</div>
+          <div style="width: 8%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff;">media/</div>
+          <div style="width: 7%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff;">tmp/</div>
+          <div style="width: 6%; background: #6b7280; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff;">...</div>
+        </div>
+
+        <!-- Path detail table -->
+        <div style="font-size: 11px;">
+          <div style="display: grid; grid-template-columns: 2.5fr 80px 80px 80px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #8b949e; text-transform: uppercase; font-size: 10px;">
+            <div>Path</div><div>Files</div><div>Size</div><div>Dupes</div><div>Usage Bar</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2.5fr 80px 80px 80px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+            <div style="display: flex; align-items: center; gap: 6px;"><span style="color: #3b82f6;">&#9632;</span> <span style="color: #fff; font-weight: 500;">/mnt/datalake/photos/</span></div>
+            <div>5,432</div>
+            <div style="font-weight: 600; color: #fff;">89.2 GB</div>
+            <div style="color: #ef4444;">128</div>
+            <div><div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;"><div style="width: 36%; height: 100%; background: #3b82f6; border-radius: 3px;"></div></div></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2.5fr 80px 80px 80px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+            <div style="display: flex; align-items: center; gap: 6px;"><span style="color: #8b5cf6;">&#9632;</span> <span style="color: #fff; font-weight: 500;">/mnt/datalake/backups/</span></div>
+            <div>1,247</div>
+            <div style="font-weight: 600; color: #fff;">69.1 GB</div>
+            <div style="color: #ef4444;">89</div>
+            <div><div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;"><div style="width: 28%; height: 100%; background: #8b5cf6; border-radius: 3px;"></div></div></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2.5fr 80px 80px 80px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+            <div style="display: flex; align-items: center; gap: 6px;"><span style="color: #22c55e;">&#9632;</span> <span style="color: #fff; font-weight: 500;">/mnt/datalake/projects/</span></div>
+            <div>4,891</div>
+            <div style="font-weight: 600; color: #fff;">37.4 GB</div>
+            <div style="color: #f59e0b;">42</div>
+            <div><div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;"><div style="width: 15%; height: 100%; background: #22c55e; border-radius: 3px;"></div></div></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2.5fr 80px 80px 80px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+            <div style="display: flex; align-items: center; gap: 6px;"><span style="color: #f59e0b;">&#9632;</span> <span style="color: #fff; font-weight: 500;">/mnt/datalake/media/</span></div>
+            <div>1,823</div>
+            <div style="font-weight: 600; color: #fff;">19.7 GB</div>
+            <div style="color: #8b949e;">31</div>
+            <div><div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;"><div style="width: 8%; height: 100%; background: #f59e0b; border-radius: 3px;"></div></div></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2.5fr 80px 80px 80px 1fr; gap: 8px; padding: 8px 0; cursor: pointer;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+            <div style="display: flex; align-items: center; gap: 6px;"><span style="color: #ef4444;">&#9632;</span> <span style="color: #fff; font-weight: 500;">/mnt/datalake/tmp/</span></div>
+            <div>1,439</div>
+            <div style="font-weight: 600; color: #fff;">17.2 GB</div>
+            <div style="color: #ef4444;">52</div>
+            <div><div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;"><div style="width: 7%; height: 100%; background: #ef4444; border-radius: 3px;"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duplicate Groups Section -->
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 600; color: #fff;"><span style="color: #7cf0ff;">&#9670;</span> Duplicate Groups <span style="font-size: 11px; color: #8b949e; font-weight: 400; margin-left: 6px;">342 groups &bull; 1,247 redundant files</span></div>
+          <div style="display: flex; gap: 6px;">
+            <div style="padding: 4px 10px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 6px; color: #a78bfa; font-size: 10px; cursor: pointer;">&#10024; AI Resolve All</div>
+            <div style="padding: 4px 10px; background: rgba(255,255,255,0.05); border-radius: 6px; color: #8b949e; font-size: 10px; cursor: pointer;">Export CSV</div>
+          </div>
+        </div>
+        <!-- Expandable row -->
+        <div style="font-size: 11px;">
+          <div style="display: grid; grid-template-columns: 2fr 70px 70px 90px 100px; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #8b949e; text-transform: uppercase; font-size: 10px;">
+            <div>Sample Path</div><div>Copies</div><div>Each</div><div>Wasted</div><div>Actions</div>
+          </div>
+          <!-- Row 1 — expanded -->
+          <div style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <div style="display: grid; grid-template-columns: 2fr 70px 70px 90px 100px; gap: 8px; padding: 8px 0; cursor: pointer;">
+              <div><span style="color: #60a5fa; margin-right: 4px;">&#9660;</span> <span style="color: #c9d1d9;">vacation_2024.jpg</span><br><span style="color: #8b949e; font-size: 10px;">/mnt/datalake/photos/</span></div>
+              <div style="color: #ef4444; font-weight: 700;">5</div>
+              <div>24.8 MB</div>
+              <div style="color: #f59e0b; font-weight: 600;">99.2 MB</div>
+              <div style="display: flex; gap: 4px;">
+                <span style="padding: 2px 6px; background: rgba(139,92,246,0.15); border-radius: 4px; color: #a78bfa; font-size: 9px; cursor: pointer;">&#10024; AI</span>
+                <span style="padding: 2px 6px; background: rgba(34,197,94,0.15); border-radius: 4px; color: #22c55e; font-size: 9px; cursor: pointer;">Keep 1</span>
+              </div>
+            </div>
+            <!-- Expanded detail -->
+            <div style="padding: 0 0 10px 20px; font-size: 10px;">
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: rgba(34,197,94,0.06); border-radius: 4px; border-left: 2px solid #22c55e;">
+                  <span style="color: #22c55e; font-weight: 700;">KEEP</span>
+                  <span style="color: #c9d1d9; flex: 1; font-family: monospace;">/mnt/datalake/photos/2024/vacation_2024.jpg</span>
+                  <span style="color: #8b949e;">Jan 15, 2024 &bull; oldest</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: rgba(239,68,68,0.04); border-radius: 4px; border-left: 2px solid rgba(239,68,68,0.3);">
+                  <input type="checkbox" checked style="accent-color: #ef4444;">
+                  <span style="color: #c9d1d9; flex: 1; font-family: monospace;">/mnt/datalake/photos/exports/vacation_2024.jpg</span>
+                  <span style="color: #8b949e;">Mar 02, 2024 &bull; copy</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: rgba(239,68,68,0.04); border-radius: 4px; border-left: 2px solid rgba(239,68,68,0.3);">
+                  <input type="checkbox" checked style="accent-color: #ef4444;">
+                  <span style="color: #c9d1d9; flex: 1; font-family: monospace;">/mnt/datalake/backups/phone/vacation_2024.jpg</span>
+                  <span style="color: #8b949e;">Mar 05, 2024 &bull; backup copy</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: rgba(239,68,68,0.04); border-radius: 4px; border-left: 2px solid rgba(239,68,68,0.3);">
+                  <input type="checkbox" checked style="accent-color: #ef4444;">
+                  <span style="color: #c9d1d9; flex: 1; font-family: monospace;">/mnt/datalake/tmp/import_batch/vacation_2024.jpg</span>
+                  <span style="color: #8b949e;">Apr 10, 2024 &bull; temp import</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: rgba(139,92,246,0.06); border-radius: 4px; border-left: 2px solid #a78bfa;">
+                  <span style="color: #a78bfa;">&#10024;</span>
+                  <span style="color: #a78bfa; font-size: 10px; line-height: 1.4;">AI: Keep the original in /photos/2024/. The /exports/ and /backups/phone/ copies are redundant sync artifacts. The /tmp/ copy is a leftover import batch.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Row 2 — collapsed -->
+          <div style="display: grid; grid-template-columns: 2fr 70px 70px 90px 100px; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;">
+            <div><span style="color: #8b949e; margin-right: 4px;">&#9654;</span> <span style="color: #c9d1d9;">db_dump_march.sql</span><br><span style="color: #8b949e; font-size: 10px;">/mnt/datalake/backups/</span></div>
+            <div style="color: #ef4444; font-weight: 700;">3</div>
+            <div>512 MB</div>
+            <div style="color: #f59e0b; font-weight: 600;">1.0 GB</div>
+            <div style="display: flex; gap: 4px;">
+              <span style="padding: 2px 6px; background: rgba(139,92,246,0.15); border-radius: 4px; color: #a78bfa; font-size: 9px; cursor: pointer;">&#10024; AI</span>
+              <span style="padding: 2px 6px; background: rgba(34,197,94,0.15); border-radius: 4px; color: #22c55e; font-size: 9px; cursor: pointer;">Keep 1</span>
+            </div>
+          </div>
+          <!-- Row 3 -->
+          <div style="display: grid; grid-template-columns: 2fr 70px 70px 90px 100px; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;">
+            <div><span style="color: #8b949e; margin-right: 4px;">&#9654;</span> <span style="color: #c9d1d9;">logo_final_v2.png</span><br><span style="color: #8b949e; font-size: 10px;">/mnt/datalake/projects/brand/</span></div>
+            <div style="color: #f59e0b; font-weight: 700;">2</div>
+            <div>4.1 MB</div>
+            <div style="color: #f59e0b; font-weight: 600;">4.1 MB</div>
+            <div style="display: flex; gap: 4px;">
+              <span style="padding: 2px 6px; background: rgba(139,92,246,0.15); border-radius: 4px; color: #a78bfa; font-size: 9px; cursor: pointer;">&#10024; AI</span>
+              <span style="padding: 2px 6px; background: rgba(34,197,94,0.15); border-radius: 4px; color: #22c55e; font-size: 9px; cursor: pointer;">Keep 1</span>
+            </div>
+          </div>
+          <div style="padding: 8px 0; color: #8b949e; text-align: center; font-size: 11px;">Showing 3 of 342 groups &bull; <span style="color: #7cf0ff; cursor: pointer; text-decoration: underline;">Load more</span></div>
+        </div>
+      </div>
+
+      <!-- Cleanup Suggestions -->
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 600; color: #fff;"><span style="color: #22c55e;">&#9881;</span> Cleanup Suggestions <span style="font-size: 11px; color: #8b949e; font-weight: 400; margin-left: 6px;">3 actionable &bull; 4.3 GB reclaimable</span></div>
+          <div style="display: flex; gap: 6px;">
+            <div style="padding: 4px 10px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); border-radius: 6px; color: #f59e0b; font-size: 10px; cursor: pointer;">Preview (Dry Run)</div>
+            <div style="padding: 4px 10px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); border-radius: 6px; color: #22c55e; font-size: 10px; cursor: pointer;">Apply Selected</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <input type="checkbox" checked style="accent-color: #22c55e;">
+            <span style="padding: 2px 8px; background: rgba(239,68,68,0.15); border-radius: 4px; color: #ef4444; font-size: 10px; font-weight: 600; min-width: 50px; text-align: center;">DELETE</span>
+            <span style="flex: 1; color: #c9d1d9;">/mnt/datalake/tmp/ffmpeg_out_2024*.tmp</span>
+            <span style="color: #f59e0b; font-weight: 600; min-width: 60px;">2.3 GB</span>
+            <span style="padding: 2px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; color: #8b949e; font-size: 10px;">47 files &bull; remove_temp_files</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <input type="checkbox" checked style="accent-color: #22c55e;">
+            <span style="padding: 2px 8px; background: rgba(239,68,68,0.15); border-radius: 4px; color: #ef4444; font-size: 10px; font-weight: 600; min-width: 50px; text-align: center;">DELETE</span>
+            <span style="flex: 1; color: #c9d1d9;">4 newer copies of <span style="color: #7cf0ff;">vacation_2024.jpg</span></span>
+            <span style="color: #f59e0b; font-weight: 600; min-width: 60px;">99.2 MB</span>
+            <span style="padding: 2px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; color: #8b949e; font-size: 10px;">4 files &bull; delete_duplicates</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <input type="checkbox" style="accent-color: #f59e0b;">
+            <span style="padding: 2px 8px; background: rgba(245,158,11,0.15); border-radius: 4px; color: #f59e0b; font-size: 10px; font-weight: 600; min-width: 50px; text-align: center;">REVIEW</span>
+            <span style="flex: 1; color: #c9d1d9;">/mnt/datalake/iso/ubuntu-22.04.iso</span>
+            <span style="color: #f59e0b; font-weight: 600; min-width: 60px;">4.2 GB</span>
+            <span style="padding: 2px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; color: #8b949e; font-size: 10px;">1 file &bull; remove_large_files</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Triage Section -->
+      <div style="background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.15); border-radius: 12px; padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 600; color: #fff;"><span style="color: #a78bfa;">&#10024;</span> AI Triage <span style="font-size: 11px; color: #8b949e; font-weight: 400; margin-left: 6px;">Last run: 2h ago on /mnt/datalake/</span></div>
+          <div style="padding: 4px 10px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 6px; color: #a78bfa; font-size: 10px; cursor: pointer;">&#10024; Run Triage</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 11px;">
+          <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 3px solid #22c55e;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #22c55e; font-weight: 700;">KEEP</span>
+              <span style="color: #8b949e; font-size: 10px;">847 files &bull; 12.3 GB</span>
+            </div>
+            <div style="color: #8b949e; line-height: 1.5;">Active project files in /projects/agentx/ — recently modified, referenced by git.</div>
+          </div>
+          <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 3px solid #f59e0b;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #f59e0b; font-weight: 700;">ARCHIVE</span>
+              <span style="color: #8b949e; font-size: 10px;">234 files &bull; 89 GB</span>
+            </div>
+            <div style="color: #8b949e; line-height: 1.5;">Stale backups from /backups/2023/ — 14+ months old. DB snapshots worth keeping in cold storage.</div>
+          </div>
+          <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 3px solid #ef4444;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #ef4444; font-weight: 700;">JUNK</span>
+              <span style="color: #8b949e; font-size: 10px;">1,203 files &bull; 4.1 GB</span>
+            </div>
+            <div style="color: #8b949e; line-height: 1.5;">Build artifacts, temp files, orphaned caches in /tmp/ and /.cache/. Safe to delete.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- AI Chat Panel -->
+    <div style="width: 300px; border-left: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); display: flex; flex-direction: column; font-size: 12px;">
+      <div style="padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px;">
+        <span style="color: #a78bfa; font-size: 16px;">&#10024;</span>
+        <span style="color: #fff; font-weight: 600; font-size: 13px;">Janitor AI</span>
+        <span style="margin-left: auto; padding: 2px 8px; background: rgba(34,197,94,0.15); border-radius: 4px; color: #22c55e; font-size: 10px;">qwen2.5:7b</span>
+      </div>
+      <div style="flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+        <div style="background: rgba(139,92,246,0.1); border-radius: 10px; padding: 10px; color: #c9d1d9; line-height: 1.5; font-size: 11px;">
+          <strong>Summary:</strong> Your datalake has <strong>342 dupe groups</strong> wasting <strong>18.4 GB</strong>. The biggest waste is in <strong>/photos/</strong> (128 groups, 6.2 GB) and <strong>/backups/</strong> (89 groups, 8.1 GB). Want me to prioritize one area?
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px; color: #c9d1d9; align-self: flex-end; line-height: 1.5; font-size: 11px;">
+          check backups for anything stale
+        </div>
+        <div style="background: rgba(139,92,246,0.1); border-radius: 10px; padding: 10px; color: #c9d1d9; line-height: 1.5; font-size: 11px;">
+          Found <strong>234 files</strong> in /backups/2023/ untouched for 14+ months (89 GB). These are mostly DB dumps and full disk images. I'd recommend <strong>archiving</strong> rather than deleting — some contain unique snapshots. Updated the triage panel.
+        </div>
+      </div>
+      <div style="padding: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <div style="display: flex; gap: 8px;">
+          <div style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; color: #8b949e; font-size: 11px;">Ask the janitor...</div>
+          <div style="padding: 8px 12px; background: rgba(139,92,246,0.2); border-radius: 8px; color: #a78bfa; cursor: pointer;">&#10148;</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

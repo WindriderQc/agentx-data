@@ -1,0 +1,175 @@
+<h2>Janitor Command Center — Layout</h2>
+<p class="subtitle">Scrolling dashboard with collapsible AI chat panel on the right</p>
+
+<div class="mockup" style="max-width: 1100px; margin: 0 auto;">
+  <div class="mockup-header">janitor.html — Full Page Layout</div>
+  <div class="mockup-body" style="padding: 0; display: flex; min-height: 700px; background: #0d1117;">
+
+    <!-- Main Content Area -->
+    <div style="flex: 1; padding: 20px; overflow-y: auto; font-size: 12px; color: #c9d1d9;">
+
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+        <div>
+          <div style="font-size: 20px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <span style="color: #7cf0ff;">&#9881;</span> Disk Janitor
+          </div>
+          <div style="color: #8b949e; font-size: 11px; margin-top: 2px;">AI-powered storage analysis, deduplication & cleanup</div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div style="padding: 6px 14px; background: rgba(124,240,255,0.12); border: 1px solid rgba(124,240,255,0.25); border-radius: 8px; color: #7cf0ff; font-size: 11px; font-weight: 600; cursor: pointer;">Analyze Directory</div>
+          <div style="padding: 6px 14px; background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25); border-radius: 8px; color: #22c55e; font-size: 11px; font-weight: 600; cursor: pointer;">Run Dedup Scan</div>
+        </div>
+      </div>
+
+      <!-- Health Metrics Row -->
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; text-align: center;">
+          <div style="font-size: 22px; font-weight: 700; color: #fff;">14,832</div>
+          <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Total Files</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; text-align: center;">
+          <div style="font-size: 22px; font-weight: 700; color: #fff;">247 GB</div>
+          <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Total Size</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; text-align: center;">
+          <div style="font-size: 22px; font-weight: 700; color: #ef4444;">342</div>
+          <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Duplicates</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; text-align: center;">
+          <div style="font-size: 22px; font-weight: 700; color: #f59e0b;">18.4 GB</div>
+          <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Wasted Space</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; text-align: center;">
+          <div style="font-size: 22px; font-weight: 700; color: #22c55e;">3</div>
+          <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-top: 2px;">Policies Active</div>
+        </div>
+      </div>
+
+      <!-- Duplicate Groups Section -->
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 600; color: #fff;"><span style="color: #7cf0ff;">&#9670;</span> Duplicate Groups</div>
+          <div style="display: flex; gap: 6px;">
+            <div style="padding: 4px 10px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 6px; color: #a78bfa; font-size: 10px; cursor: pointer;">&#10024; AI Resolve</div>
+            <div style="padding: 4px 10px; background: rgba(255,255,255,0.05); border-radius: 6px; color: #8b949e; font-size: 10px; cursor: pointer;">Export</div>
+          </div>
+        </div>
+        <!-- Table -->
+        <div style="font-size: 11px;">
+          <div style="display: grid; grid-template-columns: 2fr 80px 80px 100px 100px; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #8b949e; text-transform: uppercase; font-size: 10px;">
+            <div>Hash / Sample Path</div><div>Copies</div><div>File Size</div><div>Wasted</div><div>Action</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2fr 80px 80px 100px 100px; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <div><span style="color: #7cf0ff; font-family: monospace; font-size: 10px;">a3f8c2...</span><br><span style="color: #8b949e;">/mnt/datalake/photos/vacation_2024.jpg</span></div>
+            <div style="color: #ef4444; font-weight: 600;">5</div>
+            <div>24.8 MB</div>
+            <div style="color: #f59e0b;">99.2 MB</div>
+            <div><span style="color: #22c55e; cursor: pointer; text-decoration: underline;">Review</span></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2fr 80px 80px 100px 100px; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <div><span style="color: #7cf0ff; font-family: monospace; font-size: 10px;">d91eb7...</span><br><span style="color: #8b949e;">/mnt/datalake/backups/db_dump_march.sql</span></div>
+            <div style="color: #ef4444; font-weight: 600;">3</div>
+            <div>512 MB</div>
+            <div style="color: #f59e0b;">1.0 GB</div>
+            <div><span style="color: #22c55e; cursor: pointer; text-decoration: underline;">Review</span></div>
+          </div>
+          <div style="padding: 8px 0; color: #8b949e; text-align: center;">... 340 more groups</div>
+        </div>
+      </div>
+
+      <!-- Cleanup Suggestions Section -->
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 600; color: #fff;"><span style="color: #22c55e;">&#9881;</span> Cleanup Suggestions</div>
+          <div style="display: flex; gap: 6px;">
+            <div style="padding: 4px 10px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); border-radius: 6px; color: #22c55e; font-size: 10px; cursor: pointer;">Apply All (Dry Run)</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <input type="checkbox" checked style="accent-color: #22c55e;">
+            <span style="padding: 2px 8px; background: rgba(239,68,68,0.15); border-radius: 4px; color: #ef4444; font-size: 10px; font-weight: 600;">DELETE</span>
+            <span style="flex: 1; color: #c9d1d9;">/mnt/datalake/tmp/ffmpeg_out_2024*.tmp <span style="color: #8b949e;">(47 files, 2.3 GB)</span></span>
+            <span style="color: #8b949e;">Policy: remove_temp_files</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <input type="checkbox" checked style="accent-color: #22c55e;">
+            <span style="padding: 2px 8px; background: rgba(239,68,68,0.15); border-radius: 4px; color: #ef4444; font-size: 10px; font-weight: 600;">DELETE</span>
+            <span style="flex: 1; color: #c9d1d9;">4 newer copies of <span style="color: #7cf0ff;">vacation_2024.jpg</span></span>
+            <span style="color: #8b949e;">Policy: delete_duplicates</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            <input type="checkbox" style="accent-color: #f59e0b;">
+            <span style="padding: 2px 8px; background: rgba(245,158,11,0.15); border-radius: 4px; color: #f59e0b; font-size: 10px; font-weight: 600;">REVIEW</span>
+            <span style="flex: 1; color: #c9d1d9;">/mnt/datalake/iso/ubuntu-22.04.iso <span style="color: #8b949e;">(4.2 GB)</span></span>
+            <span style="color: #8b949e;">Policy: remove_large_files</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Triage Section -->
+      <div style="background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.15); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 14px; font-weight: 600; color: #fff;"><span style="color: #a78bfa;">&#10024;</span> AI Triage</div>
+          <div style="padding: 4px 10px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 6px; color: #a78bfa; font-size: 10px; cursor: pointer;">Triage This Folder</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px;">
+          <div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 3px solid #22c55e;">
+            <div style="color: #22c55e; font-weight: 600; margin-bottom: 4px;">KEEP — Project Assets</div>
+            <div style="color: #8b949e;">/mnt/datalake/projects/agentx/** — Active project files, recently modified. 847 files, 12.3 GB</div>
+          </div>
+          <div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 3px solid #f59e0b;">
+            <div style="color: #f59e0b; font-weight: 600; margin-bottom: 4px;">ARCHIVE — Old Backups</div>
+            <div style="color: #8b949e;">/mnt/datalake/backups/2023/** — Stale backups from 14+ months ago. 234 files, 89 GB. Consider cold storage.</div>
+          </div>
+          <div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 3px solid #ef4444;">
+            <div style="color: #ef4444; font-weight: 600; margin-bottom: 4px;">JUNK — Temp/Cache Artifacts</div>
+            <div style="color: #8b949e;">/mnt/datalake/tmp/**, /mnt/datalake/.cache/** — Build artifacts and temp files. 1,203 files, 4.1 GB. Safe to delete.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- AI Chat Panel (Right Side) -->
+    <div style="width: 320px; border-left: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); display: flex; flex-direction: column; font-size: 12px;">
+      <!-- Chat Header -->
+      <div style="padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px;">
+        <span style="color: #a78bfa; font-size: 16px;">&#10024;</span>
+        <span style="color: #fff; font-weight: 600; font-size: 13px;">Janitor AI</span>
+        <span style="margin-left: auto; color: #8b949e; font-size: 10px; padding: 2px 8px; background: rgba(34,197,94,0.15); border-radius: 4px; color: #22c55e;">qwen2.5:7b</span>
+      </div>
+      <!-- Chat Messages -->
+      <div style="flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+        <div style="background: rgba(139,92,246,0.1); border-radius: 10px; padding: 10px; color: #c9d1d9; line-height: 1.5;">
+          I found <strong>342 duplicate groups</strong> wasting <strong>18.4 GB</strong>. The top offender is <code>db_dump_march.sql</code> with 3 copies at 512 MB each. Want me to suggest which copies to keep?
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px; color: #c9d1d9; align-self: flex-end; line-height: 1.5;">
+          yes, and also check the backup folder for anything older than 6 months
+        </div>
+        <div style="background: rgba(139,92,246,0.1); border-radius: 10px; padding: 10px; color: #c9d1d9; line-height: 1.5;">
+          Done. I've flagged <strong>234 files</strong> in /backups/2023/ as stale (14+ months). They total <strong>89 GB</strong>. I'd recommend archiving rather than deleting — some contain database snapshots. See the AI Triage section for the breakdown.
+        </div>
+      </div>
+      <!-- Chat Input -->
+      <div style="padding: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <div style="display: flex; gap: 8px;">
+          <div style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; color: #8b949e;">Ask the janitor...</div>
+          <div style="padding: 8px 12px; background: rgba(139,92,246,0.2); border-radius: 8px; color: #a78bfa; cursor: pointer;">&#10148;</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top: 20px; padding: 16px; background: rgba(255,255,255,0.02); border-radius: 10px; font-size: 13px; color: #8b949e; line-height: 1.6;">
+  <strong style="color: #fff;">Sections top to bottom:</strong><br>
+  1. <strong>Header</strong> — title + primary action buttons (Analyze Directory, Run Dedup Scan)<br>
+  2. <strong>Health Metrics</strong> — 5 cards: total files, total size, duplicates, wasted space, active policies<br>
+  3. <strong>Duplicate Groups</strong> — table with inline "AI Resolve" button per group<br>
+  4. <strong>Cleanup Suggestions</strong> — checkboxes, policy tags, batch apply with dry-run<br>
+  5. <strong>AI Triage</strong> — AI-generated file classifications (keep/archive/junk) with explanations<br>
+  <strong>Right panel:</strong> Collapsible AI chat powered by qwen2.5:7b on UGFrank
+</div>

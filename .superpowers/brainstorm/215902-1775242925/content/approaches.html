@@ -1,0 +1,49 @@
+<h2>Janitor Dashboard — Architecture Approaches</h2>
+<p class="subtitle">How to structure the AI-powered janitor page</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tab-Based Dashboard</h3>
+      <p>Single page with horizontal tabs: <strong>Overview</strong> | <strong>Dedup</strong> | <strong>Cleanup</strong> | <strong>AI Triage</strong>. Chat panel slides in from the right as a drawer. Each tab is a focused workflow.</p>
+      <div style="margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.03); font-size: 13px;">
+        <div style="color: #22c55e; margin-bottom: 4px;">+ Clean separation of concerns per tab</div>
+        <div style="color: #22c55e; margin-bottom: 4px;">+ Familiar pattern (matches DataAPI storage-tool)</div>
+        <div style="color: #22c55e; margin-bottom: 4px;">+ Each tab can load data independently</div>
+        <div style="color: #ef4444; margin-bottom: 4px;">- Context switching between tabs</div>
+        <div style="color: #ef4444;">- AI chat is separate from the data you're looking at</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Command Center (Recommended)</h3>
+      <p>Vertically scrolling single page: <strong>health metrics</strong> at top, then <strong>dedup groups</strong>, <strong>cleanup suggestions</strong>, <strong>file triage</strong> — all visible. Persistent AI chat panel on the right side (collapsible). AI can highlight/annotate any section inline.</p>
+      <div style="margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.03); font-size: 13px;">
+        <div style="color: #22c55e; margin-bottom: 4px;">+ Everything visible at once — no context switching</div>
+        <div style="color: #22c55e; margin-bottom: 4px;">+ AI chat sees what you see, can reference sections</div>
+        <div style="color: #22c55e; margin-bottom: 4px;">+ Matches DocJanitor's single-page feel</div>
+        <div style="color: #ef4444; margin-bottom: 4px;">- Longer page, more scrolling</div>
+        <div style="color: #ef4444;">- Need to be smart about lazy-loading sections</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Split-Pane Workspace</h3>
+      <p>Left pane: <strong>AI chat + command input</strong> (always visible). Right pane: <strong>dynamic content area</strong> that shows whatever the current task is — dedup results, file triage table, cleanup preview. Chat drives what the right pane shows.</p>
+      <div style="margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.03); font-size: 13px;">
+        <div style="color: #22c55e; margin-bottom: 4px;">+ AI-first experience — chat is the primary interface</div>
+        <div style="color: #22c55e; margin-bottom: 4px;">+ Dynamic, feels like a copilot</div>
+        <div style="color: #ef4444; margin-bottom: 4px;">- No dashboard overview at a glance</div>
+        <div style="color: #ef4444; margin-bottom: 4px;">- More complex to build</div>
+        <div style="color: #ef4444;">- Less useful without AI — needs manual nav fallback</div>
+      </div>
+    </div>
+  </div>
+</div>

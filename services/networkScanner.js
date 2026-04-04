@@ -1,10 +1,23 @@
 const { spawn } = require('child_process');
 const xml2js = require('xml2js');
 const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
+const NMAP_MISSING_MESSAGE = 'nmap is not installed on the host. Install nmap to use network scanning.';
 
 class NetworkScanner {
   constructor() {
     this.isScanning = false;
+  }
+
+  normalizeSpawnError(err) {
+    if (err?.code === 'ENOENT') {
+      const dependencyError = new Error(NMAP_MISSING_MESSAGE);
+      dependencyError.code = 'DEPENDENCY_MISSING';
+      dependencyError.dependency = 'nmap';
+      dependencyError.cause = err;
+      return dependencyError;
+    }
+
+    return err;
   }
 
   async parseNmapOutput(xmlData) {
@@ -61,12 +74,12 @@ class NetworkScanner {
         catch (err) { reject(err); }
       });
 
-      nmap.on('error', (err) => { this.isScanning = false; reject(err); });
+      nmap.on('error', (err) => { this.isScanning = false; reject(this.normalizeSpawnError(err)); });
     });
   }
 
   enrichDevice(ip) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const nmap = spawn('nmap', ['-O', '-sV', '--top-ports', '100', '-oX', '-', ip]);
       let xmlOutput = '';
 
@@ -98,6 +111,8 @@ class NetworkScanner {
           resolve({ ip, hardware: { os: osMatch }, openPorts: ports });
         } catch { resolve(null); }
       });
+
+      nmap.on('error', (err) => reject(this.normalizeSpawnError(err)));
     });
   }
 }

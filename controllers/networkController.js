@@ -3,6 +3,10 @@ const networkScanner = require('../services/networkScanner');
 // Default scan target — local subnet
 const DEFAULT_TARGET = '192.168.2.0/24';
 
+function isMissingDependencyError(error, dependency) {
+  return error?.code === 'DEPENDENCY_MISSING' && (!dependency || error.dependency === dependency);
+}
+
 exports.getAllDevices = async (req, res, next) => {
   try {
     const db = req.app.locals.db;
@@ -60,6 +64,10 @@ exports.scanNetwork = async (req, res, next) => {
       data: { discovered: discoveredDevices.length, updated: bulkOps.length, markedOffline: offlineCount }
     });
   } catch (error) {
+    if (isMissingDependencyError(error, 'nmap')) {
+      return res.status(503).json({ status: 'error', message: 'Scan unavailable: ' + error.message });
+    }
+
     res.status(500).json({ status: 'error', message: 'Scan failed: ' + error.message });
   }
 };
@@ -113,5 +121,11 @@ exports.enrichDevice = async (req, res, next) => {
 
     const updated = await db.collection('network_devices').findOne(filter);
     res.json({ status: 'success', data: { device: updated } });
-  } catch (error) { next(error); }
+  } catch (error) {
+    if (isMissingDependencyError(error, 'nmap')) {
+      return res.status(503).json({ status: 'error', message: 'Enrichment unavailable: ' + error.message });
+    }
+
+    next(error);
+  }
 };
