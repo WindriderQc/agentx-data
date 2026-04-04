@@ -1,12 +1,14 @@
 /**
  * janitorAI.js — Ollama integration for the janitor dashboard.
- * Builds prompts, calls qwen2.5:7b on UGFrank, parses structured responses.
+ * Builds prompts, asks core scheduler for advisory placement when available,
+ * then falls back to the existing lightweight host.
  */
 const { fetchWithTimeoutAndRetry } = require('../utils/fetch-utils');
 const { log } = require('../utils/logger');
 
-const OLLAMA_URL = process.env.JANITOR_AI_URL || 'http://192.168.2.99:11434';
-const OLLAMA_MODEL = process.env.JANITOR_AI_MODEL || 'qwen2.5:7b';
+const CORE_PROXY_URL = (process.env.CORE_PROXY_URL || 'http://localhost:3080').replace(/\/+$/, '');
+const JANITOR_MODEL = process.env.JANITOR_AI_MODEL || 'qwen2.5:7b';
+const CORE_SCHEDULER_URL = process.env.CORE_SCHEDULER_URL || 'http://localhost:3080';
 
 const ACTIONS = {
   triage: {
@@ -44,7 +46,7 @@ function buildPrompt(action, context = {}) {
       break;
   }
 
-  return { model: OLLAMA_MODEL, system: actionDef.system, prompt, stream: false };
+  return { model: JANITOR_MODEL, system: actionDef.system, prompt, stream: false };
 }
 
 function parseAIResponse(raw) {
@@ -63,14 +65,74 @@ function parseAIResponse(raw) {
   return { text: raw };
 }
 
+async function resolveJanitorTarget(model = JANITOR_MODEL) {
+  const fallback = {
+    source: 'fallback',
+    url: CORE_PROXY_URL,
+    host: 'tertiary',
+    claimId: null
+  };
+
+  try {
+    const recommendUrl = new URL('/api/cluster/schedule/recommend', CORE_SCHEDULER_URL);
+    recommendUrl.searchParams.set('model', model);
+    recommendUrl.searchParams.set('durationMs', '60000');
+    recommendUrl.searchParams.set('caller', 'janitor-ai');
+
+    const recommendRes = await fetchWithTimeoutAndRetry(recommendUrl.toString(), {
+      method: 'GET',
+      timeout: 4000,
+      retries: 0,
+      name: 'janitor-scheduler-recommend'
+    });
+    const recommendJson = await recommendRes.json();
+    const recommendation = recommendJson?.data?.recommendation;
+    if (!recommendation?.hostUrl || !recommendation?.host) {
+      return fallback;
+    }
+
+    let claimId = null;
+    try {
+      const claimRes = await fetchWithTimeoutAndRetry(new URL('/api/cluster/schedule/claim', CORE_SCHEDULER_URL).toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: recommendation.host,
+          model,
+          caller: 'janitor-ai',
+          ttlMs: 60000
+        }),
+        timeout: 4000,
+        retries: 0,
+        name: 'janitor-scheduler-claim'
+      });
+      const claimJson = await claimRes.json();
+      claimId = claimJson?.data?.claimId || null;
+    } catch (claimError) {
+      log(`Janitor AI scheduler claim skipped: ${claimError.message}`, 'warn');
+    }
+
+    return {
+      source: 'scheduler',
+      url: recommendation.hostUrl,
+      host: recommendation.host,
+      claimId
+    };
+  } catch (error) {
+    log(`Janitor AI scheduler lookup failed, using fallback: ${error.message}`, 'warn');
+    return fallback;
+  }
+}
+
 async function callAI(action, context = {}) {
   const payload = buildPrompt(action, context);
   const start = Date.now();
+  const target = await resolveJanitorTarget(payload.model);
 
-  const res = await fetchWithTimeoutAndRetry(`${OLLAMA_URL}/api/generate`, {
+  const res = await fetchWithTimeoutAndRetry(`${CORE_PROXY_URL}/api/inference/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, callerDetail: `janitor-ai-${action}` }),
     timeout: 60000,
     retries: 1,
     name: `janitor-ai-${action}`
@@ -85,9 +147,18 @@ async function callAI(action, context = {}) {
   return {
     action,
     result,
-    model: OLLAMA_MODEL,
+    model: JANITOR_MODEL,
+    target: { url: target.url, host: target.host, source: target.source, claimId: target.claimId },
     duration_ms: Date.now() - start
   };
 }
 
-module.exports = { ACTIONS, buildPrompt, parseAIResponse, callAI, OLLAMA_URL, OLLAMA_MODEL };
+module.exports = {
+  ACTIONS,
+  buildPrompt,
+  parseAIResponse,
+  resolveJanitorTarget,
+  callAI,
+  JANITOR_MODEL,
+  CORE_SCHEDULER_URL
+};
