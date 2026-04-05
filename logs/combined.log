@@ -1,0 +1,8 @@
+{"level":"info","message":"test log()","timestamp":"2026-04-05 00:12:09"}
+{"key":"val","level":"info","message":"test logger.info","timestamp":"2026-04-05 00:12:09"}
+{"level":"info","message":"Starting agentx-data v1.0.0 (production)","timestamp":"2026-04-05 00:15:37"}
+{"level":"info","message":"Connected to MongoDB at mongodb://192.168.2.33:27017/agentx","timestamp":"2026-04-05 00:15:37"}
+{"level":"info","message":"agentx-data listening on port 3083","timestamp":"2026-04-05 00:15:39"}
+{"level":"info","message":"[liveData] Config reloaded: {\"liveDataEnabled\":false,\"iss\":false,\"quakes\":false,\"weather\":false}","timestamp":"2026-04-05 00:15:39"}
+{"level":"info","message":"[liveData] Master switch OFF — no intervals","timestamp":"2026-04-05 00:15:39"}
+{"level":"info","message":"[liveData] Initialized","timestamp":"2026-04-05 00:15:39"}

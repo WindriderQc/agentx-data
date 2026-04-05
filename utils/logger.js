@@ -1,21 +1,12 @@
-const winston = require('winston');
+/**
+ * Data service logger — delegates to shared factory.
+ * Factory: ./createLogger.js (standardized across all AgentX services)
+ * Preserves legacy { log, logger } export shape for backward compat.
+ */
+const path = require('path');
+const { createLogger } = require('./createLogger');
 
-const level = process.env.LOG_LEVEL || 'info';
-const silent = process.env.NODE_ENV === 'test';
-
-const logger = winston.createLogger({
-  level,
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      ),
-      silent
-    })
-  ]
-});
+const logger = createLogger(path.join(__dirname, '../logs'));
 
 const log = (message, level = 'info') => {
   logger.log(level, message);
