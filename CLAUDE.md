@@ -145,10 +145,6 @@ Webhook sink for n8n, ClickUp, and generic sources.
 | `/api/v1/integrations/webhooks/clickup` | POST | ClickUp webhook sink |
 | `/api/v1/integrations/webhooks/:source` | POST | Generic webhook sink |
 
-### Generic CRUD Factory
-Utility module — not a route, but available for creating instant CRUD endpoints.
-**Usage:** `const ctrl = require('./utils/genericCrud')('myCollection');`
-
 ---
 
 ## Collection Ownership
@@ -217,6 +213,5 @@ data/
     ├── eventEmitter.js         # Shared pub/sub bus
     ├── fetch-utils.js          # HTTP fetch with timeout + retry
     ├── file-operations.js
-    ├── genericCrud.js          # CRUD factory for any collection
     └── logger.js
 ```
