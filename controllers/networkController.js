@@ -32,9 +32,9 @@ exports.scanNetwork = async (req, res, next) => {
 
     const bulkOps = discoveredDevices.map(device => ({
       updateOne: {
-        filter: { mac: device.mac },
+        filter: device.mac ? { mac: device.mac } : { ip: device.ip, mac: { $in: [null, ''] } },
         update: {
-          $set: { ip: device.ip, hostname: device.hostname, vendor: device.vendor, status: 'online', lastSeen: new Date() },
+          $set: { ip: device.ip, mac: device.mac, hostname: device.hostname, vendor: device.vendor, status: 'online', lastSeen: new Date() },
           $setOnInsert: { firstSeen: new Date(), alias: '', notes: '' }
         },
         upsert: true
@@ -47,11 +47,11 @@ exports.scanNetwork = async (req, res, next) => {
 
     let offlineCount = 0;
     if (pruneMissing === true) {
-      const discoveredMacs = new Set(discoveredDevices.map(d => d.mac));
+      const discoveredIps = new Set(discoveredDevices.map(d => d.ip));
       const allOnline = await db.collection('network_devices').find({ status: 'online' }).toArray();
       const offlineOps = allOnline
-        .filter(d => !discoveredMacs.has(d.mac))
-        .map(d => ({ updateOne: { filter: { mac: d.mac }, update: { $set: { status: 'offline' } } } }));
+        .filter(d => !discoveredIps.has(d.ip))
+        .map(d => ({ updateOne: { filter: { _id: d._id }, update: { $set: { status: 'offline' } } } }));
 
       if (offlineOps.length > 0) {
         await db.collection('network_devices').bulkWrite(offlineOps);

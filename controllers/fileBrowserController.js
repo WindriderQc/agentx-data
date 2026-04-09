@@ -1,5 +1,6 @@
 const path = require('path');
 const { formatFileSize } = require('../utils/file-operations');
+const { formatFilePath } = require('../utils/fileHelpers');
 const { resolveAllowedPath } = require('../services/janitorService');
 
 class FileBrowserController {
@@ -39,7 +40,7 @@ class FileBrowserController {
 
       const formattedResults = results.map(file => ({
         ...file,
-        path: FileBrowserController._formatFilePath(file),
+        path: formatFilePath(file),
         sizeFormatted: formatFileSize(file.size),
         mtimeFormatted: new Date(file.mtime * 1000).toISOString()
       }));
@@ -214,12 +215,12 @@ class FileBrowserController {
               type: 'large_files', priority: 'high',
               message: `Found ${largeFiles.length} files over 100MB`,
               potentialSavings: largeFiles.reduce((sum, f) => sum + f.size, 0),
-              files: largeFiles.map(f => ({ path: FileBrowserController._formatFilePath(f), size: f.size, sizeFormatted: formatFileSize(f.size) }))
+              files: largeFiles.map(f => ({ path: formatFilePath(f), size: f.size, sizeFormatted: formatFileSize(f.size) }))
             },
             {
               type: 'old_files', priority: 'medium',
               message: `Found ${oldFiles.length} files older than 2 years`,
-              files: oldFiles.map(f => ({ path: FileBrowserController._formatFilePath(f), age: Math.floor((Date.now() / 1000 - f.mtime) / 86400) + ' days', size: formatFileSize(f.size) }))
+              files: oldFiles.map(f => ({ path: formatFilePath(f), age: Math.floor((Date.now() / 1000 - f.mtime) / 86400) + ' days', size: formatFileSize(f.size) }))
             },
             {
               type: 'duplicates', priority: 'high',
@@ -366,11 +367,6 @@ class FileBrowserController {
     return labels[boundaries.indexOf(boundary)] || 'other';
   }
 
-  static _formatFilePath(file) {
-    if (file.path) return file.path;
-    if (!file.dirname) return file.filename || '';
-    return path.join(file.dirname, file.filename || '');
-  }
 }
 
 module.exports = FileBrowserController;

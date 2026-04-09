@@ -4,15 +4,10 @@
  */
 const path = require('path');
 const { formatFileSize, ensureDir, listFilesWithMeta, validateFilename, exists } = require('../utils/file-operations');
+const { formatFilePath } = require('../utils/fileHelpers');
 const fs = require('fs/promises');
 
 const EXPORT_DIR = path.join(__dirname, '../exports');
-
-function formatFilePath(file) {
-  if (file.path) return file.path;
-  if (!file.dirname) return file.filename || '';
-  return path.join(file.dirname, file.filename || '');
-}
 
 async function generateOptimizedReport(db, reportType) {
   const nasFiles = db.collection('nas_files');

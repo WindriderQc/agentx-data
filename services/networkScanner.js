@@ -37,7 +37,7 @@ class NetworkScanner {
           if (addr.addrtype === 'mac') { mac = addr.addr; vendor = addr.vendor || ''; }
         });
 
-        if (!mac) return null;
+        if (!ip) return null;
 
         let hostname = '';
         if (host.hostnames?.hostname) {
@@ -58,7 +58,7 @@ class NetworkScanner {
       if (this.isScanning) return reject(new Error('Scan already in progress'));
       this.isScanning = true;
 
-      const nmap = spawn('nmap', ['-sn', '-oX', '-', targetCIDR]);
+      const nmap = spawn('nmap', ['-sn', '--privileged', '-oX', '-', targetCIDR]);
       let xmlOutput = '', errorOutput = '';
 
       nmap.stdout.on('data', (data) => { xmlOutput += data.toString(); });
