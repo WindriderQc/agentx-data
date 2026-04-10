@@ -43,6 +43,8 @@ Browse, search, and analyze indexed files.
 | `/api/v1/storage/files/cleanup-recommendations` | GET | Cleanup suggestions |
 | `/api/v1/storage/files/:id` | PATCH | Update file metadata |
 
+The `?category=<name>` filter (document, media, archive, code, config) translates to an `ext: { $in: [...] }` query at request time. Used by RAG to discover ingestion candidates without re-scanning.
+
 ### Datalake Janitor
 Deduplication workflow: suggest, mark, confirm deletions.
 **Consumer:** Admin tooling, n8n
@@ -134,6 +136,23 @@ Live directory analysis — hash files, find dupes, suggest + execute cleanup.
 | `/api/v1/janitor/dedup-report` | GET | Get latest (or specific) dedup report |
 | `/api/v1/janitor/dedup-approve` | POST | Approve deletions (requires confirmation token, dry-run default) |
 
+### Janitor Profiles
+Profile-driven scan orchestration: named scan profiles with optional in-process schedules. A run chains scan → dedup → optional AI triage → reviewable action queue.
+**Consumer:** Admin tooling, RAG (via category filter)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/janitor/profiles` | GET | List profiles |
+| `/api/v1/janitor/profiles` | POST | Create profile |
+| `/api/v1/janitor/profiles/:id` | GET | Get profile |
+| `/api/v1/janitor/profiles/:id` | PUT | Update profile |
+| `/api/v1/janitor/profiles/:id` | DELETE | Delete profile (run history preserved) |
+| `/api/v1/janitor/profiles/:id/run` | POST | Trigger ad-hoc run |
+| `/api/v1/janitor/profiles/:id/runs` | GET | List runs for a profile |
+| `/api/v1/janitor/profiles/runs/:run_id` | GET | Get one run with proposed_actions |
+| `/api/v1/janitor/profiles/runs/:run_id/actions/:idx/approve` | POST | Approve & execute action |
+| `/api/v1/janitor/profiles/runs/:run_id/actions/:idx/reject` | POST | Reject action |
+
 ### Integrations
 Webhook sink for n8n, ClickUp, and generic sources.
 **Consumer:** n8n, external workflows
@@ -164,6 +183,8 @@ Webhook sink for n8n, ClickUp, and generic sources.
 | `weatherLocations` | Registered weather tracking locations |
 | `integration_events` | Webhook event inbox (n8n, ClickUp, etc.) |
 | `dedup_reports` | Persistent dedup analysis reports (groups, summaries) |
+| `janitor_profiles` | Saved scan profiles (roots, policies, schedule, AI triage flag) |
+| `janitor_runs` | Per-run record: scan id, dedup ref, AI verdict, reviewable proposed_actions |
 
 ## Directory Structure
 

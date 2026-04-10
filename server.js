@@ -11,6 +11,7 @@ const apiKeyAuth = require('./middleware/apiKeyAuth');
 const { general: generalLimiter, heavy: heavyLimiter } = require('./middleware/rateLimiter');
 const storageController = require('./controllers/storageController');
 const liveData = require('./services/liveData');
+const janitorScheduler = require('./services/janitorScheduler');
 const eventController = require('./controllers/eventController');
 const pjson = require('./package.json');
 
@@ -48,6 +49,7 @@ app.use('/api/v1/livedata', require('./routes/livedata.routes'));
 app.use('/api/v1/databases', require('./routes/databases.routes'));
 app.use('/api/v1/exports', require('./routes/exports.routes'));
 app.use('/api/v1/janitor', require('./routes/janitor.routes'));
+app.use('/api/v1/janitor/profiles', require('./routes/janitor-profiles.routes'));
 app.use('/api/v1/integrations', require('./routes/integrations.routes'));
 
 // Error handler
@@ -91,6 +93,8 @@ async function start() {
     if (process.env.NODE_ENV !== 'test') {
       try { await liveData.init(db); }
       catch (e) { log(`[liveData] Init failed: ${e.message}`, 'warn'); }
+      try { await janitorScheduler.init(db); }
+      catch (e) { log(`[janitorScheduler] Init failed: ${e.message}`, 'warn'); }
     }
   });
 
@@ -108,6 +112,7 @@ async function shutdown() {
   log('Shutting down agentx-data...');
   try { eventController.drainSSE(); } catch (e) { log(`[shutdown] drainSSE error: ${e.message}`, 'warn'); }
   try { await liveData.close(); } catch (e) { log(`[shutdown] liveData.close error: ${e.message}`, 'warn'); }
+  try { await janitorScheduler.close(); } catch (e) { log(`[shutdown] janitorScheduler.close error: ${e.message}`, 'warn'); }
   if (server) {
     await new Promise(r => server.close(r));
   }

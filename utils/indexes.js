@@ -9,6 +9,10 @@ const INDEX_SPECS = [
   { collection: 'appevents', key: { timestamp: -1 }, options: { name: 'timestamp_desc' } },
   { collection: 'dedup_reports', key: { created_at: -1 }, options: { name: 'created_at_desc' } },
   { collection: 'nas_pending_deletions', key: { status: 1, marked_at: -1 }, options: { name: 'status_marked_at' } },
+  { collection: 'janitor_profiles', key: { name: 1 }, options: { name: 'name_unique', unique: true } },
+  { collection: 'janitor_profiles', key: { 'schedule.enabled': 1 }, options: { name: 'schedule_enabled' } },
+  { collection: 'janitor_runs', key: { profile_id: 1, started_at: -1 }, options: { name: 'profile_started' } },
+  { collection: 'janitor_runs', key: { status: 1 }, options: { name: 'status' } },
 
   // TTL indexes — automatic retention for high-growth collections
   { collection: 'appevents', key: { timestamp: 1 }, options: { name: 'ttl_30d', expireAfterSeconds: 2592000 } },
