@@ -95,6 +95,13 @@ describe('PUT /:id', () => {
     const res = await request(buildApp()).put('/api/v1/janitor/profiles/x').send({});
     expect(res.status).toBe(404);
   });
+
+  test('returns 400 on badRequest (invalid id)', async () => {
+    janitorProfiles.update.mockResolvedValue({ ok: false, badRequest: true, errors: ['invalid id'] });
+    const res = await request(buildApp()).put('/api/v1/janitor/profiles/bad-id').send({});
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(['invalid id']);
+  });
 });
 
 describe('DELETE /:id', () => {
@@ -109,6 +116,13 @@ describe('DELETE /:id', () => {
     janitorProfiles.remove.mockResolvedValue({ ok: false, notFound: true });
     const res = await request(buildApp()).delete('/api/v1/janitor/profiles/x');
     expect(res.status).toBe(404);
+  });
+
+  test('returns 400 on badRequest (invalid id)', async () => {
+    janitorProfiles.remove.mockResolvedValue({ ok: false, badRequest: true, errors: ['invalid id'] });
+    const res = await request(buildApp()).delete('/api/v1/janitor/profiles/bad-id');
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(['invalid id']);
   });
 });
 
@@ -130,6 +144,13 @@ describe('POST /:id/run', () => {
     janitorRunner.runProfile.mockResolvedValue({ ok: false, notFound: true });
     const res = await request(buildApp()).post('/api/v1/janitor/profiles/x/run');
     expect(res.status).toBe(404);
+  });
+
+  test('returns 500 on generic runner failure', async () => {
+    janitorRunner.runProfile.mockResolvedValue({ ok: false, error: 'scan failed' });
+    const res = await request(buildApp()).post('/api/v1/janitor/profiles/a/run');
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('scan failed');
   });
 });
 
@@ -189,5 +210,17 @@ describe('POST /runs/:run_id/actions/:idx/reject', () => {
     const res = await request(buildApp()).post('/api/v1/janitor/profiles/runs/r1/actions/0/reject');
     expect(res.status).toBe(200);
     expect(res.body.data.action.status).toBe('rejected');
+  });
+
+  test('returns 404 when run/action missing', async () => {
+    janitorRunner.rejectAction.mockResolvedValue({ ok: false, notFound: true });
+    const res = await request(buildApp()).post('/api/v1/janitor/profiles/runs/r1/actions/0/reject');
+    expect(res.status).toBe(404);
+  });
+
+  test('returns 409 when action is not pending', async () => {
+    janitorRunner.rejectAction.mockResolvedValue({ ok: false, error: 'action is rejected' });
+    const res = await request(buildApp()).post('/api/v1/janitor/profiles/runs/r1/actions/0/reject');
+    expect(res.status).toBe(409);
   });
 });

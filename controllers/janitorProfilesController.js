@@ -3,6 +3,17 @@
  *
  * Thin layer over janitorProfiles + janitorRunner + janitorScheduler.
  * Translates service results into HTTP status codes; never owns business logic.
+ *
+ * Response shape:
+ *   Success: { status: 'success', data: { ... } }
+ *   Error:   { status: 'error', message: string }     (single-message errors)
+ *            { status: 'error', errors: string[] }    (validation / multi-error)
+ *
+ * Status mapping: 201 create, 202 run accepted, 400 validation/badRequest,
+ * 404 missing, 409 conflict/alreadyRunning/action-not-pending, 500 internal.
+ *
+ * Each mutating endpoint (create/update/remove) calls scheduler.reload() in
+ * a guarded try/catch so a reload failure does not poison a successful write.
  */
 const janitorProfiles = require('../services/janitorProfiles');
 const janitorRunner = require('../services/janitorRunner');
@@ -37,7 +48,11 @@ const create = async (req, res) => {
       const status = result.conflict ? 409 : 400;
       return res.status(status).json({ status: 'error', errors: result.errors });
     }
-    await janitorScheduler.reload(req.app.locals.db, String(result.profile._id));
+    try {
+      await janitorScheduler.reload(req.app.locals.db, String(result.profile._id));
+    } catch (reloadErr) {
+      log(`[janitorProfiles] scheduler reload failed (profile ${result.profile._id} created): ${reloadErr.message}`, 'warn');
+    }
     res.status(201).json({ status: 'success', data: { profile: result.profile } });
   } catch (err) {
     log(`[janitorProfiles] create error: ${err.message}`, 'error');
@@ -55,7 +70,11 @@ const update = async (req, res) => {
       else if (result.badRequest) status = 400;
       return res.status(status).json({ status: 'error', errors: result.errors });
     }
-    await janitorScheduler.reload(req.app.locals.db, req.params.id);
+    try {
+      await janitorScheduler.reload(req.app.locals.db, req.params.id);
+    } catch (reloadErr) {
+      log(`[janitorProfiles] scheduler reload failed (profile ${req.params.id} updated): ${reloadErr.message}`, 'warn');
+    }
     res.json({ status: 'success', data: { profile: result.profile } });
   } catch (err) {
     log(`[janitorProfiles] update error: ${err.message}`, 'error');
@@ -67,11 +86,14 @@ const remove = async (req, res) => {
   try {
     const result = await janitorProfiles.remove(req.app.locals.db, req.params.id);
     if (!result.ok) {
-      let status = 404;
-      if (result.badRequest) status = 400;
-      return res.status(status).json({ status: 'error', errors: result.errors, message: 'profile not found' });
+      const status = result.badRequest ? 400 : 404;
+      return res.status(status).json({ status: 'error', errors: result.errors });
     }
-    await janitorScheduler.reload(req.app.locals.db, req.params.id);
+    try {
+      await janitorScheduler.reload(req.app.locals.db, req.params.id);
+    } catch (reloadErr) {
+      log(`[janitorProfiles] scheduler reload failed (profile ${req.params.id} deleted): ${reloadErr.message}`, 'warn');
+    }
     res.json({ status: 'success', message: 'profile deleted' });
   } catch (err) {
     log(`[janitorProfiles] remove error: ${err.message}`, 'error');
