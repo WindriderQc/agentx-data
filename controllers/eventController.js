@@ -1,4 +1,9 @@
 const appEmitter = require('../utils/eventEmitter');
+const { log } = require('../utils/logger');
+
+const MAX_SSE_CONNECTIONS = 50;
+let sseConnectionCount = 0;
+const sseConnections = new Set();
 
 /**
  * Log an event to the database and emit for SSE subscribers.
@@ -12,7 +17,7 @@ async function logEvent(db, message, type = 'info', opts = {}) {
     await db.collection('appevents').insertOne(doc);
     appEmitter.emit('newEvent', doc);
   } catch (error) {
-    console.error(`[events] Failed to log: "${message}"`, error);
+    log(`[events] Failed to log: "${message}" — ${error.message}`, 'error');
   }
 }
 
@@ -21,14 +26,26 @@ async function logEvent(db, message, type = 'info', opts = {}) {
 exports.getEvents = async (req, res, next) => {
   try {
     const db = req.app.locals.db;
-    const limit = parseInt(req.query.limit) || 50;
+    const { page = 1, limit = 50 } = req.query;
     const type = req.query.type;
+    const parsedPage = Math.max(1, parseInt(page));
+    const parsedLimit = Math.max(1, Math.min(200, parseInt(limit)));
+    const skip = (parsedPage - 1) * parsedLimit;
 
     const filter = type ? { type } : {};
-    const events = await db.collection('appevents')
-      .find(filter).sort({ timestamp: -1 }).limit(limit).toArray();
+    const col = db.collection('appevents');
+    const [total, events] = await Promise.all([
+      col.countDocuments(filter),
+      col.find(filter).sort({ timestamp: -1 }).skip(skip).limit(parsedLimit).toArray()
+    ]);
 
-    res.json({ status: 'success', data: { events, count: events.length } });
+    res.json({
+      status: 'success',
+      data: {
+        events,
+        pagination: { total, page: parsedPage, limit: parsedLimit, pages: Math.ceil(total / parsedLimit) }
+      }
+    });
   } catch (error) { next(error); }
 };
 
@@ -47,6 +64,12 @@ exports.createEvent = async (req, res, next) => {
  * SSE stream — pushes real-time events to connected clients.
  */
 exports.streamEvents = (req, res) => {
+  if (sseConnectionCount >= MAX_SSE_CONNECTIONS) {
+    return res.status(503).json({ status: 'error', message: 'Too many SSE connections' });
+  }
+  sseConnectionCount++;
+  sseConnections.add(res);
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -60,7 +83,7 @@ exports.streamEvents = (req, res) => {
       if (typeFilter && data.type !== typeFilter) return;
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     } catch (e) {
-      console.error('[events] SSE write error:', e);
+      log(`[events] SSE write error: ${e.message}`, 'error');
     }
   };
 
@@ -69,10 +92,23 @@ exports.streamEvents = (req, res) => {
   const heartbeat = setInterval(() => { res.write(': heartbeat\n\n'); }, 15000);
 
   req.on('close', () => {
+    sseConnectionCount--;
+    sseConnections.delete(res);
     appEmitter.removeListener('newEvent', sendEvent);
     clearInterval(heartbeat);
     res.end();
   });
 };
 
-exports.logEvent = logEvent;
+/**
+ * Close all active SSE connections — call during graceful shutdown.
+ */
+exports.drainSSE = () => {
+  for (const res of sseConnections) {
+    try { res.end(); } catch { /* already closed */ }
+  }
+  sseConnections.clear();
+  sseConnectionCount = 0;
+};
+
+

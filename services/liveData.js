@@ -55,12 +55,18 @@ async function getISS() {
     mqttClient.publish(config.iss.topic, doc);
 
     const col = db.collection('isses');
-    const count = await col.countDocuments();
-    if (count >= config.iss.maxLogs) {
-      const oldest = await col.findOne({}, { sort: { timeStamp: 1 } });
-      if (oldest) await col.deleteOne({ _id: oldest._id });
-    }
     await col.insertOne(doc);
+
+    // Bulk-prune when over limit (batch delete oldest instead of one-at-a-time)
+    const count = await col.countDocuments();
+    if (count > config.iss.maxLogs) {
+      const excess = count - config.iss.maxLogs;
+      const oldest = await col.find({}, { projection: { _id: 1 } })
+        .sort({ timeStamp: 1 }).limit(excess).toArray();
+      if (oldest.length > 0) {
+        await col.deleteMany({ _id: { $in: oldest.map(d => d._id) } });
+      }
+    }
   } catch (err) { log(`[liveData] ISS error: ${err.message}`, 'error'); }
 }
 
@@ -75,12 +81,22 @@ async function getQuakes() {
     const quakes = await CSVToJSON().fromString(csv);
 
     const col = db.collection('quakes');
-    await col.deleteMany({});
-    if (quakes.length > 0) {
-      await col.insertMany(quakes, { ordered: false }).catch(e => {
-        if (e.code !== 11000) log(`[liveData] Quakes write error: ${e.message}`, 'error');
-      });
+
+    // Atomic-ish refresh: write to temp collection, then rename (replaces old data instantly)
+    const tempName = 'quakes_temp_' + Date.now();
+    const tempCol = db.collection(tempName);
+    try {
+      if (quakes.length > 0) {
+        await tempCol.insertMany(quakes, { ordered: false });
+      }
+      // Rename replaces the target collection atomically
+      await tempCol.rename('quakes', { dropTarget: true });
+    } catch (e) {
+      // Cleanup temp collection on failure
+      try { await tempCol.drop(); } catch { /* may not exist */ }
+      throw e;
     }
+
     log(`[liveData] Quakes refreshed: ${quakes.length} records`);
   } catch (err) { log(`[liveData] Quakes error: ${err.message}`, 'error'); }
 }
@@ -118,7 +134,7 @@ function startIntervals(immediate = false) {
     if (state.iss) tasks.push(getISS());
     if (state.quakes) tasks.push(getQuakes());
     if (state.weather) tasks.push(getPressure());
-    Promise.all(tasks).catch(() => {});
+    Promise.all(tasks).catch(err => log(`[liveData] Immediate fetch error: ${err.message}`, 'warn'));
   }
 
   if (state.iss) intervalIds.push(setInterval(getISS, config.iss.interval));

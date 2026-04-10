@@ -1,3 +1,5 @@
+const { log } = require('./logger');
+
 async function fetchWithTimeoutAndRetry(url, options = {}) {
   const { timeout = 8000, retries = 1, name = 'request', ...fetchOptions } = options;
   const backoff = (attempt) => Math.min(500 * Math.pow(2, attempt), 5000);
@@ -20,7 +22,7 @@ async function fetchWithTimeoutAndRetry(url, options = {}) {
       const isTimeout = err.name === 'AbortError' || err.type === 'aborted' || err.code === 'UND_ERR_CONNECT_TIMEOUT';
       const willRetry = attempt < retries && (isTimeout || err.code === 'ECONNRESET' || err.code === 'ENOTFOUND');
 
-      console.log(`[fetch] ${name} attempt ${attempt + 1}/${retries + 1} failed: ${err.message} ${willRetry ? '(retrying)' : ''}`);
+      log(`[fetch] ${name} attempt ${attempt + 1}/${retries + 1} failed: ${err.message} ${willRetry ? '(retrying)' : ''}`, willRetry ? 'warn' : 'error');
       if (!willRetry) throw err;
       await new Promise(r => setTimeout(r, backoff(attempt)));
     }

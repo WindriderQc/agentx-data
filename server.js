@@ -7,8 +7,11 @@ const { MongoClient } = require('mongodb');
 const { log } = require('./utils/logger');
 const { ensureIndexes } = require('./utils/indexes');
 const errorHandler = require('./middleware/errorHandler');
+const apiKeyAuth = require('./middleware/apiKeyAuth');
+const { general: generalLimiter, heavy: heavyLimiter } = require('./middleware/rateLimiter');
 const storageController = require('./controllers/storageController');
 const liveData = require('./services/liveData');
+const eventController = require('./controllers/eventController');
 const pjson = require('./package.json');
 
 const app = express();
@@ -25,6 +28,16 @@ app.get('/', (req, res) => res.redirect('/health'));
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'agentx-data', version: pjson.version, ts: Date.now() });
 });
+
+// API key authentication (when DATA_API_KEY is set)
+app.use(apiKeyAuth);
+
+// Rate limiting
+app.use('/api/', generalLimiter);
+app.use('/api/v1/storage/scan', heavyLimiter);
+app.use('/api/v1/network/scan', heavyLimiter);
+app.use('/api/v1/janitor/analyze', heavyLimiter);
+app.use('/api/v1/janitor/dedup-scan', heavyLimiter);
 
 // API routes
 app.use('/api/v1/storage', require('./routes/storage.routes'));
@@ -47,9 +60,19 @@ let server;
 async function start() {
   log(`Starting agentx-data v${pjson.version} (${process.env.NODE_ENV || 'development'})`);
 
-  client = new MongoClient(MONGODB_URI);
+  client = new MongoClient(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000,
+    heartbeatFrequencyMS: 10000
+  });
   await client.connect();
-  log(`Connected to MongoDB at ${MONGODB_URI}`);
+  // Sanitize URI for logging — strip credentials
+  const safeUri = MONGODB_URI.replace(/\/\/[^@]*@/, '//<credentials>@');
+  log(`Connected to MongoDB at ${safeUri}`);
+
+  // Log topology events for monitoring
+  client.on('serverHeartbeatFailed', (ev) => log(`[MongoDB] Heartbeat failed: ${ev.failure?.message}`, 'warn'));
+  client.on('topologyOpening', () => log('[MongoDB] Topology opening'));
+  client.on('topologyClosed', () => log('[MongoDB] Topology closed'));
 
   // Parse DB name from URI or default to 'agentx'
   const dbName = new URL(MONGODB_URI).pathname.slice(1) || 'agentx';
@@ -82,14 +105,33 @@ async function start() {
 }
 
 async function shutdown() {
-  await liveData.close();
-  if (server) await new Promise(r => server.close(r));
-  if (client) await client.close();
+  log('Shutting down agentx-data...');
+  try { eventController.drainSSE(); } catch (e) { log(`[shutdown] drainSSE error: ${e.message}`, 'warn'); }
+  try { await liveData.close(); } catch (e) { log(`[shutdown] liveData.close error: ${e.message}`, 'warn'); }
+  if (server) {
+    await new Promise(r => server.close(r));
+  }
+  if (client) {
+    try { await client.close(); } catch (e) { log(`[shutdown] MongoDB close error: ${e.message}`, 'warn'); }
+  }
   log('agentx-data shut down.');
 }
 
-process.on('SIGINT', async () => { await shutdown(); process.exit(0); });
-process.on('SIGTERM', async () => { await shutdown(); process.exit(0); });
+process.on('SIGINT', async () => {
+  const timer = setTimeout(() => { log('Shutdown timed out, forcing exit', 'error'); process.exit(1); }, 10000);
+  await shutdown();
+  clearTimeout(timer);
+  process.exit(0);
+});
+process.on('SIGTERM', async () => {
+  const timer = setTimeout(() => { log('Shutdown timed out, forcing exit', 'error'); process.exit(1); }, 10000);
+  await shutdown();
+  clearTimeout(timer);
+  process.exit(0);
+});
+process.on('unhandledRejection', (reason) => {
+  log(`Unhandled rejection: ${reason?.message || reason}`, 'error');
+});
 
 if (require.main === module) {
   start().catch(err => {

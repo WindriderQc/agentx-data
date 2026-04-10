@@ -8,7 +8,12 @@ const INDEX_SPECS = [
   { collection: 'nas_scans', key: { started_at: -1 }, options: { name: 'started_at_desc' } },
   { collection: 'appevents', key: { timestamp: -1 }, options: { name: 'timestamp_desc' } },
   { collection: 'dedup_reports', key: { created_at: -1 }, options: { name: 'created_at_desc' } },
-  { collection: 'nas_pending_deletions', key: { status: 1, marked_at: -1 }, options: { name: 'status_marked_at' } }
+  { collection: 'nas_pending_deletions', key: { status: 1, marked_at: -1 }, options: { name: 'status_marked_at' } },
+
+  // TTL indexes — automatic retention for high-growth collections
+  { collection: 'appevents', key: { timestamp: 1 }, options: { name: 'ttl_30d', expireAfterSeconds: 2592000 } },
+  { collection: 'pressures', key: { timeStamp: 1 }, options: { name: 'ttl_90d', expireAfterSeconds: 7776000 } },
+  { collection: 'integration_events', key: { at: 1 }, options: { name: 'ttl_90d', expireAfterSeconds: 7776000 } }
 ];
 
 async function ensureIndexes(db) {

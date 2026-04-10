@@ -3,6 +3,9 @@ const xml2js = require('xml2js');
 const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
 const NMAP_MISSING_MESSAGE = 'nmap is not installed on the host. Install nmap to use network scanning.';
 
+const SCAN_TIMEOUT_MS = 120_000;   // 2 minutes for ping sweeps
+const ENRICH_TIMEOUT_MS = 60_000;  // 1 minute for port/OS detection
+
 class NetworkScanner {
   constructor() {
     this.isScanning = false;
@@ -48,7 +51,6 @@ class NetworkScanner {
         return { ip, mac, vendor, hostname, status: 'online', lastSeen: new Date() };
       }).filter(Boolean);
     } catch (error) {
-      console.error('Error parsing Nmap XML:', error);
       return [];
     }
   }
@@ -61,20 +63,26 @@ class NetworkScanner {
       const nmap = spawn('nmap', ['-sn', '--privileged', '-oX', '-', targetCIDR]);
       let xmlOutput = '', errorOutput = '';
 
+      const timer = setTimeout(() => {
+        nmap.kill('SIGTERM');
+        this.isScanning = false;
+        reject(new Error(`Network scan timed out after ${SCAN_TIMEOUT_MS / 1000}s`));
+      }, SCAN_TIMEOUT_MS);
+
       nmap.stdout.on('data', (data) => { xmlOutput += data.toString(); });
       nmap.stderr.on('data', (data) => { errorOutput += data.toString(); });
 
       nmap.on('close', async (code) => {
+        clearTimeout(timer);
         this.isScanning = false;
         if (code !== 0) {
-          console.error('Nmap Error:', errorOutput);
           return reject(new Error(`Nmap exited with code ${code}`));
         }
         try { resolve(await this.parseNmapOutput(xmlOutput)); }
         catch (err) { reject(err); }
       });
 
-      nmap.on('error', (err) => { this.isScanning = false; reject(this.normalizeSpawnError(err)); });
+      nmap.on('error', (err) => { clearTimeout(timer); this.isScanning = false; reject(this.normalizeSpawnError(err)); });
     });
   }
 
@@ -83,9 +91,15 @@ class NetworkScanner {
       const nmap = spawn('nmap', ['-O', '-sV', '--top-ports', '100', '-oX', '-', ip]);
       let xmlOutput = '';
 
+      const timer = setTimeout(() => {
+        nmap.kill('SIGTERM');
+        reject(new Error(`Device enrichment timed out after ${ENRICH_TIMEOUT_MS / 1000}s`));
+      }, ENRICH_TIMEOUT_MS);
+
       nmap.stdout.on('data', (data) => { xmlOutput += data.toString(); });
 
       nmap.on('close', async (code) => {
+        clearTimeout(timer);
         if (code !== 0) return resolve(null);
         try {
           const result = await parser.parseStringPromise(xmlOutput);
@@ -112,7 +126,7 @@ class NetworkScanner {
         } catch { resolve(null); }
       });
 
-      nmap.on('error', (err) => reject(this.normalizeSpawnError(err)));
+      nmap.on('error', (err) => { clearTimeout(timer); reject(this.normalizeSpawnError(err)); });
     });
   }
 }

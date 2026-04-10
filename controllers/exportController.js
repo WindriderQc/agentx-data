@@ -6,22 +6,60 @@ const path = require('path');
 const { formatFileSize, ensureDir, listFilesWithMeta, validateFilename, exists } = require('../utils/file-operations');
 const { formatFilePath } = require('../utils/fileHelpers');
 const fs = require('fs/promises');
+const { createWriteStream } = require('fs');
 
 const EXPORT_DIR = path.join(__dirname, '../exports');
+
+/**
+ * Stream a "full" report directly to a JSON file without loading all docs into memory.
+ * Returns { totalFiles } after streaming completes.
+ */
+async function streamFullReport(db, filePath) {
+  const cursor = db.collection('nas_files').find({}).sort({ dirname: 1, filename: 1 });
+  const ws = createWriteStream(filePath);
+  const generatedAt = new Date().toISOString();
+
+  return new Promise((resolve, reject) => {
+    let count = 0;
+    ws.write(`{"reportType":"full","generatedAt":"${generatedAt}","files":[\n`);
+
+    function writeNext() {
+      cursor.next().then(doc => {
+        if (!doc) {
+          ws.write(`\n],"totalFiles":${count}}`);
+          ws.end();
+          return;
+        }
+        let row;
+        try {
+          row = JSON.stringify({
+            path: formatFilePath(doc), filename: doc.filename, dirname: doc.dirname,
+            ext: doc.ext, size: doc.size, sizeFormatted: formatFileSize(doc.size), mtime: doc.mtime
+          });
+        } catch (e) {
+          count++; // skip bad document
+          writeNext();
+          return;
+        }
+        const prefix = count > 0 ? ',\n' : '';
+        count++;
+        if (ws.write(prefix + row)) {
+          writeNext();
+        } else {
+          ws.once('drain', writeNext);
+        }
+      }).catch(reject);
+    }
+
+    ws.on('finish', () => resolve({ totalFiles: count }));
+    ws.on('error', reject);
+    writeNext();
+  });
+}
 
 async function generateOptimizedReport(db, reportType) {
   const nasFiles = db.collection('nas_files');
   const nasDirs = db.collection('nas_directories');
-
-  if (reportType === 'full') {
-    const files = [];
-    const cursor = nasFiles.find({}).sort({ dirname: 1, filename: 1 });
-    while (await cursor.hasNext()) {
-      const f = await cursor.next();
-      files.push({ path: formatFilePath(f), filename: f.filename, dirname: f.dirname, ext: f.ext, size: f.size, sizeFormatted: formatFileSize(f.size), mtime: f.mtime });
-    }
-    return { reportType: 'full', generatedAt: new Date().toISOString(), totalFiles: files.length, files };
-  }
 
   if (reportType === 'summary') {
     let dirs = await nasDirs.find({}).sort({ total_size: -1 }).toArray();
@@ -101,12 +139,23 @@ exports.generateReport = async (req, res, next) => {
     const type = req.body.type || req.query.type || 'full';
     const format = req.body.format || req.query.format || 'json';
 
-    const data = await generateOptimizedReport(db, type);
     const now = new Date();
     const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
     const filename = `export_${type}_${ts}.${format}`;
     const filePath = path.join(EXPORT_DIR, filename);
     await ensureDir(EXPORT_DIR);
+
+    // "full" JSON exports stream directly to file (memory-safe for large collections)
+    if (type === 'full' && format === 'json') {
+      const { totalFiles } = await streamFullReport(db, filePath);
+      const stats = await fs.stat(filePath);
+      return res.json({
+        status: 'success',
+        data: { filename, size: stats.size, sizeFormatted: formatFileSize(stats.size), recordCount: totalFiles, generatedAt: now.toISOString() }
+      });
+    }
+
+    const data = await generateOptimizedReport(db, type);
 
     const content = format === 'csv' ? convertToCSV(data) : JSON.stringify(data, null, 2);
     await fs.writeFile(filePath, content);
@@ -141,4 +190,4 @@ exports.deleteExport = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-exports.generateOptimizedReport = generateOptimizedReport;
+
