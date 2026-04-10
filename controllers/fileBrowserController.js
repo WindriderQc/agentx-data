@@ -16,6 +16,11 @@ class FileBrowserController {
         page = 1, limit = 100
       } = req.query;
 
+      const allowedSortFields = ['mtime', 'size', 'filename', 'ext', 'dirname', 'created_at', 'updated_at'];
+      const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'mtime';
+      const parsedPage = Math.max(1, parseInt(page) || 1);
+      const parsedLimit = Math.min(500, Math.max(1, parseInt(limit) || 100));
+
       const filter = {};
       const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       if (search) filter.filename = { $regex: escRe(search), $options: 'i' };
@@ -30,12 +35,12 @@ class FileBrowserController {
         if (maxSize < Infinity) filter.size.$lte = parseInt(maxSize);
       }
 
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-      const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+      const skip = (parsedPage - 1) * parsedLimit;
+      const sort = { [safeSortBy]: sortOrder === 'asc' ? 1 : -1 };
 
       const [totalCount, results] = await Promise.all([
         files.countDocuments(filter),
-        files.find(filter).sort(sort).skip(skip).limit(parseInt(limit)).toArray()
+        files.find(filter).sort(sort).skip(skip).limit(parsedLimit).toArray()
       ]);
 
       const formattedResults = results.map(file => ({
@@ -50,8 +55,8 @@ class FileBrowserController {
         data: {
           files: formattedResults,
           pagination: {
-            total: totalCount, page: parseInt(page),
-            limit: parseInt(limit), pages: Math.ceil(totalCount / parseInt(limit))
+            total: totalCount, page: parsedPage,
+            limit: parsedLimit, pages: Math.ceil(totalCount / parsedLimit)
           }
         }
       });
@@ -343,15 +348,19 @@ class FileBrowserController {
       const db = req.app.locals.db;
       if (!id) return res.status(400).json({ status: 'error', message: 'Missing file ID' });
 
-      delete updates._id; delete updates.path; delete updates.created_at;
+      const allowedFields = ['tags', 'notes', 'category', 'starred', 'reviewed'];
+      const safeUpdates = {};
+      for (const key of Object.keys(updates)) {
+        if (allowedFields.includes(key)) safeUpdates[key] = updates[key];
+      }
 
       let result = await db.collection('nas_files').findOneAndUpdate(
-        { _id: id }, { $set: { ...updates, updated_at: new Date() } }, { returnDocument: 'after' }
+        { _id: id }, { $set: { ...safeUpdates, updated_at: new Date() } }, { returnDocument: 'after' }
       );
 
       if (!result) {
         result = await db.collection('nas_files').findOneAndUpdate(
-          { path: id }, { $set: { ...updates, updated_at: new Date() } }, { returnDocument: 'after' }
+          { path: id }, { $set: { ...safeUpdates, updated_at: new Date() } }, { returnDocument: 'after' }
         );
         if (!result) return res.status(404).json({ status: 'error', message: `File not found: ${id}` });
       }

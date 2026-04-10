@@ -1,5 +1,6 @@
 const pidusage = require('pidusage');
 const os = require('os');
+const { log } = require('../utils/logger');
 
 const getSystemStats = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ const getSystemStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching system stats:', error);
+    log(`[system] Error fetching system stats: ${error.message}`, 'error');
     res.status(500).json({ status: 'error', message: 'Failed to fetch system stats', error: error.message });
   }
 };

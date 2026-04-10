@@ -42,9 +42,12 @@ exports.createClickUpEvent = async (req, res, next) => {
 exports.createWebhookEvent = async (req, res, next) => {
   try {
     const db = req.app.locals.db;
+    // Sanitize source: alphanumeric + hyphens/underscores only, max 64 chars
+    const rawSource = req.params.source || 'unknown';
+    const source = rawSource.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'unknown';
     const body = { ...req.body };
     if (body.data !== undefined) body.data = normalizeData(body.data);
-    await db.collection('integration_events').insertOne({ src: req.params.source, at: new Date(), body });
+    await db.collection('integration_events').insertOne({ src: source, at: new Date(), body });
     res.json({ ok: true });
   } catch (err) { next(err); }
 };

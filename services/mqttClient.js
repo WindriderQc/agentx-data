@@ -1,6 +1,8 @@
 let mqtt;
 try { mqtt = require('mqtt'); } catch { mqtt = null; }
 
+const { log } = require('../utils/logger');
+
 let client;
 
 function init(options = {}) {
@@ -8,11 +10,11 @@ function init(options = {}) {
 
   const brokerUrl = process.env.MQTT_BROKER_URL;
   if (!brokerUrl) {
-    console.log('[MQTT] No MQTT_BROKER_URL configured — skipping');
+    log('[MQTT] No MQTT_BROKER_URL configured — skipping');
     return;
   }
   if (!mqtt) {
-    console.log('[MQTT] mqtt package not installed — skipping');
+    log('[MQTT] mqtt package not installed — skipping');
     return;
   }
 
@@ -22,9 +24,9 @@ function init(options = {}) {
     ...options
   });
 
-  client.on('connect', () => console.log('[MQTT] Connected'));
-  client.on('error', (err) => console.error('[MQTT] Error:', err));
-  client.on('reconnect', () => console.log('[MQTT] Reconnecting...'));
+  client.on('connect', () => log('[MQTT] Connected'));
+  client.on('error', (err) => log(`[MQTT] Error: ${err.message}`, 'error'));
+  client.on('reconnect', () => log('[MQTT] Reconnecting...'));
   return client;
 }
 
@@ -32,7 +34,7 @@ function publish(topic, message) {
   if (!client?.connected) return;
   const payload = typeof message === 'object' ? JSON.stringify(message) : message;
   client.publish(topic, payload, (err) => {
-    if (err) console.error('[MQTT] Publish error:', err);
+    if (err) log(`[MQTT] Publish error: ${err.message}`, 'error');
   });
 }
 
@@ -43,4 +45,4 @@ function close() {
   });
 }
 
-module.exports = { init, publish, close, getClient: () => client };
+module.exports = { init, publish, close };

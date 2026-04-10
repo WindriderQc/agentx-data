@@ -1,6 +1,7 @@
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const path = require('path');
+const { log } = require('./logger');
 
 function formatFileSize(bytes) {
   if (!bytes || !Number.isFinite(bytes) || bytes <= 0) return '0 B';
@@ -22,7 +23,7 @@ async function ensureDir(dirPath) {
     await fs.mkdir(dirPath, { recursive: true });
     return true;
   } catch (error) {
-    console.error(`Failed to create directory ${dirPath}:`, error);
+    log(`Failed to create directory ${dirPath}: ${error.message}`, 'error');
     return false;
   }
 }
@@ -58,7 +59,7 @@ async function listFilesWithMeta(dirPath, options = {}) {
     }
     return filtered;
   } catch (error) {
-    console.error(`Failed to list files in ${dirPath}:`, error);
+    log(`Failed to list files in ${dirPath}: ${error.message}`, 'error');
     return [];
   }
 }

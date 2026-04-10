@@ -3,6 +3,41 @@
  * Admin/debug utility for all AgentX services.
  */
 
+const { logger } = require('../utils/logger');
+const { BadRequest } = require('../utils/errors');
+
+// Collections visible via the database browser API
+const ALLOWED_COLLECTIONS = new Set([
+  'nas_files', 'nas_scans', 'nas_directories', 'nas_pending_deletions',
+  'appevents', 'network_devices',
+  'isses', 'quakes', 'pressures', 'weatherLocations',
+  'integration_events', 'dedup_reports'
+]);
+
+function assertAllowedCollection(name) {
+  if (!ALLOWED_COLLECTIONS.has(name)) {
+    throw new BadRequest(`Collection "${name}" is not accessible via the browser API`);
+  }
+}
+
+/**
+ * Recursively strip MongoDB operators (keys starting with $) from a query object.
+ */
+function stripMongoOperators(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(stripMongoOperators);
+
+  const cleaned = {};
+  for (const key of Object.keys(obj)) {
+    if (key.startsWith('$')) {
+      logger.warn(`Stripped MongoDB operator "${key}" from database browser query`);
+      continue;
+    }
+    cleaned[key] = stripMongoOperators(obj[key]);
+  }
+  return cleaned;
+}
+
 exports.listCollections = async (req, res, next) => {
   try {
     const db = req.app.locals.db;
@@ -44,16 +79,19 @@ exports.queryCollection = async (req, res, next) => {
   try {
     const db = req.app.locals.db;
     const { name } = req.params;
+    assertAllowedCollection(name);
 
-    let { skip = 0, limit = 50, sort = 'desc', q } = req.query;
-    skip = Math.max(0, parseInt(skip) || 0);
+    let { page = 1, limit = 50, sort = 'desc', q } = req.query;
+    const parsedPage = Math.max(1, parseInt(page) || 1);
     limit = Math.min(500, Math.max(1, parseInt(limit) || 50));
+    const skip = (parsedPage - 1) * limit;
     const sortDir = sort === 'asc' ? 1 : -1;
 
     // Optional JSON filter via ?q={"field":"value"}
     let filter = {};
     if (q) {
-      try { filter = JSON.parse(q); } catch { /* ignore bad JSON */ }
+      try { filter = stripMongoOperators(JSON.parse(q)); }
+      catch { return next(new BadRequest('Invalid JSON in q parameter')); }
     }
 
     const collection = db.collection(name);
@@ -65,7 +103,7 @@ exports.queryCollection = async (req, res, next) => {
     res.json({
       status: 'success',
       data: documents,
-      meta: { collection: name, total, skip, limit, sort, has_more: total - (skip + limit) > 0 }
+      pagination: { total, page: parsedPage, limit, pages: Math.ceil(total / limit) }
     });
   } catch (error) { next(error); }
 };
@@ -74,6 +112,7 @@ exports.getDocument = async (req, res, next) => {
   try {
     const db = req.app.locals.db;
     const { name, id } = req.params;
+    assertAllowedCollection(name);
     const { ObjectId } = require('mongodb');
 
     let filter;
@@ -91,6 +130,7 @@ exports.getCollectionStats = async (req, res, next) => {
   try {
     const db = req.app.locals.db;
     const { name } = req.params;
+    assertAllowedCollection(name);
 
     const [count, collStats] = await Promise.all([
       db.collection(name).countDocuments(),

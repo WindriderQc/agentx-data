@@ -1,4 +1,5 @@
 const { GeneralError } = require('../utils/errors');
+const { log } = require('../utils/logger');
 
 function errorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
@@ -17,7 +18,7 @@ function errorHandler(err, req, res, next) {
     ? `Internal server error: ${String(err.message).split('\n')[0].slice(0, 200)}`
     : 'An internal server error occurred.';
 
-  console.error(err?.stack || String(err));
+  log(err?.stack || String(err), 'error');
   return res.status(500).json({ status: 'error', message: shortMsg });
 }
 

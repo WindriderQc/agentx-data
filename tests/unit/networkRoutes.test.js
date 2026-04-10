@@ -110,3 +110,71 @@ describe('POST /api/v1/network/devices/:id/enrich', () => {
     expect(res.body.message).toMatch(/nmap is not installed/);
   });
 });
+
+describe('GET /api/v1/network/devices', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns discovered devices', async () => {
+    const devices = [
+      { _id: 'd1', ip: '192.168.2.10', mac: 'AA:BB:CC:DD:EE:FF', status: 'online' },
+      { _id: 'd2', ip: '192.168.2.11', mac: '11:22:33:44:55:66', status: 'offline' }
+    ];
+    const db = buildDb({
+      find: jest.fn(() => ({
+        sort: jest.fn(() => ({
+          toArray: jest.fn().mockResolvedValue(devices)
+        }))
+      }))
+    });
+
+    const res = await request(buildApp(db))
+      .get('/api/v1/network/devices')
+      .expect(200);
+
+    expect(res.body.status).toBe('success');
+    expect(res.body.results).toBe(2);
+    expect(res.body.data.devices).toHaveLength(2);
+  });
+
+  test('returns empty list when no devices', async () => {
+    const db = buildDb();
+    const res = await request(buildApp(db))
+      .get('/api/v1/network/devices')
+      .expect(200);
+
+    expect(res.body.results).toBe(0);
+    expect(res.body.data.devices).toHaveLength(0);
+  });
+});
+
+describe('PATCH /api/v1/network/devices/:id', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('updates device metadata', async () => {
+    const device = { _id: 'd1', ip: '192.168.2.10', alias: 'Printer' };
+    const db = buildDb({
+      findOneAndUpdate: jest.fn().mockResolvedValue(device)
+    });
+
+    const res = await request(buildApp(db))
+      .patch('/api/v1/network/devices/AA:BB:CC:DD:EE:FF')
+      .send({ alias: 'Printer', notes: 'Office floor 2' })
+      .expect(200);
+
+    expect(res.body.status).toBe('success');
+    expect(res.body.data.device.alias).toBe('Printer');
+  });
+
+  test('returns 404 when device not found', async () => {
+    const db = buildDb({
+      findOneAndUpdate: jest.fn().mockResolvedValue(null)
+    });
+
+    const res = await request(buildApp(db))
+      .patch('/api/v1/network/devices/AA:BB:CC:DD:EE:FF')
+      .send({ alias: 'Unknown' })
+      .expect(404);
+
+    expect(res.body.message).toMatch(/not found/i);
+  });
+});

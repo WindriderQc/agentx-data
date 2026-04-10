@@ -1,6 +1,8 @@
 const { Scanner } = require('../services/scanner');
 const { ObjectId } = require('mongodb');
 const { resolveAllowedPath } = require('../services/janitorService');
+const { log } = require('../utils/logger');
+const { fetchWithTimeoutAndRetry } = require('../utils/fetch-utils');
 
 // Track running scans so they can be stopped
 const runningScans = new Map();
@@ -20,10 +22,10 @@ async function cleanupStaleScans(db) {
       { $set: { status: 'stopped', finished_at: new Date() } }
     );
     if (result.modifiedCount > 0) {
-      console.log(`[Storage] Cleaned up ${result.modifiedCount} stale running scan(s)`);
+      log(`[Storage] Cleaned up ${result.modifiedCount} stale running scan(s)`);
     }
   } catch (error) {
-    console.error('[Storage] Error cleaning up stale scans:', error);
+    log(`[Storage] Error cleaning up stale scans: ${error.message}`, 'error');
   }
 }
 
@@ -61,7 +63,7 @@ const scan = async (req, res) => {
       computeHashes: compute_hashes === true,
       hashMaxSize: hash_max_size || 100 * 1024 * 1024
     }).catch(err => {
-      console.error(`[Storage] Scan ${scan_id} failed:`, err.message);
+      log(`[Storage] Scan ${scan_id} failed: ${err.message}`, 'error');
       runningScans.delete(scan_id);
     });
 
@@ -71,7 +73,7 @@ const scan = async (req, res) => {
       data: { scan_id, roots: safeRoots, extensions, exclude_extensions, batch_size: batch_size || 1000 }
     });
   } catch (error) {
-    console.error('Error starting scan:', error);
+    log(`[Storage] Error starting scan: ${error.message}`, 'error');
     res.status(500).json({ status: 'error', message: 'Failed to start scan', error: error.message });
   }
 };
@@ -99,7 +101,7 @@ const getStatus = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Failed to get scan status:', error);
+    log(`[Storage] Failed to get scan status: ${error.message}`, 'error');
     res.status(500).json({ status: 'error', message: 'Failed to retrieve scan status', error: error.message });
   }
 };
@@ -115,20 +117,24 @@ const stopScan = async (req, res) => {
     scanner.stop();
     res.json({ status: 'success', message: 'Stop request sent', data: { scan_id } });
   } catch (error) {
-    console.error('Failed to stop scan:', error);
+    log(`[Storage] Failed to stop scan: ${error.message}`, 'error');
     res.status(500).json({ status: 'error', message: 'Failed to stop scan', error: error.message });
   }
 };
 
 const listScans = async (req, res) => {
   try {
-    const { limit = 10, skip = 0 } = req.query;
+    const { page = 1, limit = 10 } = req.query;
     const db = req.app.locals.db;
+    const parsedPage = Math.max(1, parseInt(page));
+    const parsedLimit = Math.max(1, Math.min(100, parseInt(limit)));
+    const skip = (parsedPage - 1) * parsedLimit;
 
-    const scans = await db.collection('nas_scans')
-      .find({}).sort({ started_at: -1 })
-      .skip(parseInt(skip)).limit(parseInt(limit))
-      .toArray();
+    const col = db.collection('nas_scans');
+    const [total, scans] = await Promise.all([
+      col.countDocuments(),
+      col.find({}).sort({ started_at: -1 }).skip(skip).limit(parsedLimit).toArray()
+    ]);
 
     const scansWithLive = scans.map(scan => {
       const isLive = runningScans.has(scan._id);
@@ -142,9 +148,15 @@ const listScans = async (req, res) => {
       };
     });
 
-    res.json({ status: 'success', data: { scans: scansWithLive, count: scansWithLive.length } });
+    res.json({
+      status: 'success',
+      data: {
+        scans: scansWithLive,
+        pagination: { total, page: parsedPage, limit: parsedLimit, pages: Math.ceil(total / parsedLimit) }
+      }
+    });
   } catch (error) {
-    console.error('Failed to list scans:', error);
+    log(`[Storage] Failed to list scans: ${error.message}`, 'error');
     res.status(500).json({ status: 'error', message: 'Failed to retrieve scans list', error: error.message });
   }
 };
@@ -221,7 +233,7 @@ const insertBatch = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Failed to insert batch:', error);
+    log(`[Storage] Failed to insert batch: ${error.message}`, 'error');
     res.status(500).json({ status: 'error', message: 'Failed to insert file batch', error: error.message });
   }
 };
@@ -240,7 +252,10 @@ const updateScan = async (req, res) => {
       updateFields.finished_at = completedAt ? new Date(completedAt) : new Date();
     }
     if (stats) {
-      Object.entries(stats).forEach(([key, value]) => { updateFields[`counts.${key}`] = value; });
+      const allowedStats = ['files_processed', 'inserted', 'updated', 'errors', 'skipped', 'directories'];
+      Object.entries(stats).forEach(([key, value]) => {
+        if (allowedStats.includes(key)) updateFields[`counts.${key}`] = value;
+      });
     }
 
     const result = await db.collection('nas_scans').updateOne({ _id: scan_id }, { $set: updateFields });
@@ -249,16 +264,17 @@ const updateScan = async (req, res) => {
     // Trigger n8n webhook if scan completed
     const n8nUrl = resolveN8nUrl();
     if (status === 'completed' && n8nUrl) {
-      fetch(n8nUrl, {
+      fetchWithTimeoutAndRetry(n8nUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: 'scan_complete', scan_id, stats: stats || {} })
-      }).catch(err => console.error('[Storage] Failed to trigger n8n webhook:', err.message));
+        body: JSON.stringify({ event: 'scan_complete', scan_id, stats: stats || {} }),
+        timeout: 5000, retries: 1, name: 'n8n-webhook'
+      }).catch(err => log(`[Storage] Failed to trigger n8n webhook: ${err.message}`, 'warn'));
     }
 
     res.json({ status: 'success', message: 'Scan updated', data: { scan_id, updated: updateFields } });
   } catch (error) {
-    console.error('Failed to update scan:', error);
+    log(`[Storage] Failed to update scan: ${error.message}`, 'error');
     res.status(500).json({ status: 'error', message: 'Failed to update scan', error: error.message });
   }
 };
