@@ -11,10 +11,12 @@ const janitorProfiles = require('./janitorProfiles');
 const janitorRunner = require('./janitorRunner');
 const { log } = require('../utils/logger');
 
+const { MIN_INTERVAL_MINUTES } = janitorProfiles;
+
 // profileId → NodeJS.Timeout
 const timers = new Map();
 
-const MIN_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes (matches MIN_INTERVAL_MINUTES)
+const MIN_INTERVAL_MS = MIN_INTERVAL_MINUTES * 60 * 1000;
 
 function _hasValidSchedule(profile) {
   return !!(
@@ -22,7 +24,7 @@ function _hasValidSchedule(profile) {
     profile.schedule &&
     profile.schedule.enabled === true &&
     typeof profile.schedule.intervalMinutes === 'number' &&
-    profile.schedule.intervalMinutes >= 5
+    profile.schedule.intervalMinutes >= MIN_INTERVAL_MINUTES
   );
 }
 
@@ -36,6 +38,8 @@ function _clearTimer(key) {
 
 function _armTimer(db, profile) {
   const key = String(profile._id);
+  // Clear first: reload() may race if two CRUD calls yield concurrently;
+  // _armTimer always wins because the last write to the Map wins.
   _clearTimer(key);
   const intervalMs = Math.max(MIN_INTERVAL_MS, profile.schedule.intervalMinutes * 60 * 1000);
   const handle = setInterval(() => {

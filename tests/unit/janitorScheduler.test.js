@@ -1,13 +1,17 @@
 jest.useFakeTimers();
 
-jest.mock('../../services/janitorProfiles', () => ({ list: jest.fn(), get: jest.fn() }));
+jest.mock('../../services/janitorProfiles', () => ({ list: jest.fn(), get: jest.fn(), MIN_INTERVAL_MINUTES: 5 }));
 jest.mock('../../services/janitorRunner', () => ({
   runProfile: jest.fn(async () => ({ ok: true })),
   sweepStaleRuns: jest.fn(async () => 0)
 }));
+jest.mock('../../utils/logger', () => ({
+  log: jest.fn()
+}));
 
 const janitorProfiles = require('../../services/janitorProfiles');
 const janitorRunner = require('../../services/janitorRunner');
+const { log } = require('../../utils/logger');
 const janitorScheduler = require('../../services/janitorScheduler');
 
 const mockDb = { collection: jest.fn() };
@@ -109,9 +113,16 @@ describe('janitorScheduler timer firing', () => {
     await janitorScheduler.init(mockDb);
 
     jest.advanceTimersByTime(10 * 60 * 1000);
+    // Allow microtasks: timer handler, runProfile rejection, .catch handler
     await Promise.resolve();
-    // No unhandled rejection — test reaches here without crashing
+    await Promise.resolve();
+
     expect(janitorRunner.runProfile).toHaveBeenCalled();
+    // Verify the rejection was caught and routed through the warn logger
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('boom'),
+      'warn'
+    );
   });
 });
 
