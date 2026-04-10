@@ -13,7 +13,7 @@ class FileBrowserController {
         search = '', ext = '', dirname = '', scan_id = '', hasHash = '',
         minSize = 0, maxSize = Infinity,
         sortBy = 'mtime', sortOrder = 'desc',
-        page = 1, limit = 100
+        page = 1, limit = 100, category = ''
       } = req.query;
 
       const allowedSortFields = ['mtime', 'size', 'filename', 'ext', 'dirname', 'created_at', 'updated_at'];
@@ -24,7 +24,13 @@ class FileBrowserController {
       const filter = {};
       const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       if (search) filter.filename = { $regex: escRe(search), $options: 'i' };
-      if (ext) filter.ext = ext.toLowerCase();
+      if (ext) {
+        filter.ext = ext.toLowerCase();
+      } else if (category) {
+        const { categoryToExts } = require('../utils/categories');
+        const exts = categoryToExts(category);
+        if (exts) filter.ext = { $in: [...exts] };
+      }
       if (dirname) filter.dirname = { $regex: `^${escRe(dirname)}`, $options: 'i' };
       if (scan_id) filter.scan_id = scan_id;
       if (hasHash === 'true') filter.sha256 = { $exists: true, $ne: null };

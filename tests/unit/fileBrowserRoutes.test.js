@@ -295,3 +295,67 @@ describe('File Browser Routes', () => {
     });
   });
 });
+
+const fileBrowserController = require('../../controllers/fileBrowserController');
+
+describe('browseFiles category filter', () => {
+  test('?category=document translates to ext $in [pdf,docx,...]', async () => {
+    let captured;
+    const app = express();
+    app.use(express.json());
+    app.locals.db = {
+      collection: jest.fn(() => ({
+        find: jest.fn((filter) => {
+          captured = filter;
+          return { sort: () => ({ skip: () => ({ limit: () => ({ toArray: async () => [] }) }) }) };
+        }),
+        countDocuments: jest.fn(async () => 0)
+      }))
+    };
+    app.get('/files/browse', fileBrowserController.browseFiles);
+
+    const res = await request(app).get('/files/browse?category=document');
+    expect(res.status).toBe(200);
+    expect(captured.ext).toEqual({ $in: expect.arrayContaining(['pdf', 'docx', 'txt']) });
+  });
+
+  test('unknown category is ignored (no error, no filter)', async () => {
+    let captured;
+    const app = express();
+    app.use(express.json());
+    app.locals.db = {
+      collection: jest.fn(() => ({
+        find: jest.fn((filter) => {
+          captured = filter;
+          return { sort: () => ({ skip: () => ({ limit: () => ({ toArray: async () => [] }) }) }) };
+        }),
+        countDocuments: jest.fn(async () => 0)
+      }))
+    };
+    app.get('/files/browse', fileBrowserController.browseFiles);
+
+    const res = await request(app).get('/files/browse?category=nonsense');
+    expect(res.status).toBe(200);
+    expect(captured.ext).toBeUndefined();
+  });
+
+  test('?ext=pdf takes precedence over category', async () => {
+    let captured;
+    const app = express();
+    app.use(express.json());
+    app.locals.db = {
+      collection: jest.fn(() => ({
+        find: jest.fn((filter) => {
+          captured = filter;
+          return { sort: () => ({ skip: () => ({ limit: () => ({ toArray: async () => [] }) }) }) };
+        }),
+        countDocuments: jest.fn(async () => 0)
+      }))
+    };
+    app.get('/files/browse', fileBrowserController.browseFiles);
+
+    const res = await request(app).get('/files/browse?ext=pdf&category=media');
+    expect(res.status).toBe(200);
+    expect(captured.ext).toBe('pdf');
+  });
+});
