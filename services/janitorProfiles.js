@@ -113,7 +113,7 @@ async function create(db, input) {
 }
 
 async function update(db, id, input) {
-  if (!id || !ObjectId.isValid(id)) return { ok: false, errors: ['invalid id'], notFound: true };
+  if (!id || !ObjectId.isValid(id)) return { ok: false, errors: ['invalid id'], badRequest: true };
 
   const validation = await validate(input);
   if (!validation.ok) return { ok: false, errors: validation.errors };
@@ -132,13 +132,15 @@ async function update(db, id, input) {
     { $set: updates },
     { returnDocument: 'after' }
   );
+  // MongoDB driver v4/v5 returned { value: doc }; v6+ returns the doc directly.
+  // This handles both shapes; do not "simplify" without confirming the driver version.
   const profile = result?.value || result;
   if (!profile) return { ok: false, errors: ['profile not found'], notFound: true };
   return { ok: true, profile };
 }
 
 async function remove(db, id) {
-  if (!id || !ObjectId.isValid(id)) return { ok: false, notFound: true };
+  if (!id || !ObjectId.isValid(id)) return { ok: false, errors: ['invalid id'], badRequest: true };
   const result = await db.collection(COLLECTION).deleteOne({ _id: new ObjectId(id) });
   if (result.deletedCount === 0) return { ok: false, notFound: true };
   return { ok: true };

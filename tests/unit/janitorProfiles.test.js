@@ -92,25 +92,31 @@ describe('janitorProfiles CRUD (mocked db)', () => {
       collection: jest.fn(() => ({
         find: () => ({ sort: () => ({ toArray: async () => [...profiles] }) }),
         findOne: async (filter) => {
-          if (filter._id) return profiles.find(p => String(p._id) === String(filter._id)) || null;
+          // Exact _id lookup (no $ne operator)
+          if (filter._id && !filter._id.$ne) {
+            return profiles.find(p => String(p._id) === String(filter._id)) || null;
+          }
+          // Name lookup, optionally excluding a specific _id (collision check during update)
           if (filter.name) {
+            const excludeId = filter._id?.$ne ? String(filter._id.$ne) : null;
             return profiles.find(p =>
-              p.name === filter.name &&
-              (!filter._id || String(p._id) !== String(filter._id?.$ne))
+              p.name === filter.name && (!excludeId || String(p._id) !== excludeId)
             ) || null;
           }
           return null;
         },
         insertOne: async (doc) => {
-          const inserted = { ...doc, _id: { toString: () => 'gen-' + (profiles.length + 1) } };
+          const { ObjectId } = require('mongodb');
+          const _id = new ObjectId();
+          const inserted = { ...doc, _id };
           profiles.push(inserted);
-          return { insertedId: inserted._id };
+          return { insertedId: _id };
         },
         findOneAndUpdate: async (filter, update) => {
           const idx = profiles.findIndex(p => String(p._id) === String(filter._id));
-          if (idx === -1) return { value: null };
+          if (idx === -1) return null;
           profiles[idx] = { ...profiles[idx], ...update.$set };
-          return { value: profiles[idx] };
+          return profiles[idx];
         },
         deleteOne: async (filter) => {
           const idx = profiles.findIndex(p => String(p._id) === String(filter._id));
@@ -155,10 +161,50 @@ describe('janitorProfiles CRUD (mocked db)', () => {
     expect(result.notFound).toBe(true);
   });
 
-  test('remove returns notFound for malformed id', async () => {
+  test('remove returns badRequest for malformed id', async () => {
     const db = makeMockDb();
     const result = await janitorProfiles.remove(db, 'not-an-objectid');
     expect(result.ok).toBe(false);
+    expect(result.badRequest).toBe(true);
+  });
+
+  test('update with invalid id returns badRequest', async () => {
+    const db = makeMockDb([{ _id: 'a', name: 'Media' }]);
+    const result = await janitorProfiles.update(db, 'not-an-objectid', validInput());
+    expect(result.ok).toBe(false);
+    expect(result.badRequest).toBe(true);
+  });
+
+  test('update with unknown id returns notFound', async () => {
+    const db = makeMockDb([]);
+    const result = await janitorProfiles.update(db, '507f1f77bcf86cd799439011', validInput());
+    expect(result.ok).toBe(false);
     expect(result.notFound).toBe(true);
+  });
+
+  test('update with name collision against another profile returns conflict', async () => {
+    const { ObjectId } = require('mongodb');
+    const otherId = new ObjectId();
+    const targetId = new ObjectId();
+    const db = makeMockDb([
+      { _id: otherId, name: 'Taken' },
+      { _id: targetId, name: 'OldName' }
+    ]);
+    const input = { ...validInput(), name: 'Taken' };
+    const result = await janitorProfiles.update(db, String(targetId), input);
+    expect(result.ok).toBe(false);
+    expect(result.conflict).toBe(true);
+  });
+
+  test('update success returns updated profile', async () => {
+    const { ObjectId } = require('mongodb');
+    const id = new ObjectId();
+    const db = makeMockDb([
+      { _id: id, name: 'OldName', roots: ['/mnt/datalake/old'], policies: [], schedule: null }
+    ]);
+    const input = { ...validInput(), name: 'NewName' };
+    const result = await janitorProfiles.update(db, String(id), input);
+    expect(result.ok).toBe(true);
+    expect(result.profile.name).toBe('NewName');
   });
 });
