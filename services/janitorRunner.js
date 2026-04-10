@@ -95,45 +95,32 @@ async function _runDedup(db, profile) {
   return { reportId, merged };
 }
 
-/**
- * Build proposed actions by calling janitorService.buildSuggestions.
- * Constructs a minimal analysis object from the dedup report for the service call.
- * Adds `status: 'pending'` to each suggestion so the review queue can track state.
- */
 function _buildProposedActions(profile, dedupMerged) {
-  // Build a minimal analysis compatible with buildSuggestions internals.
-  // When dedupMerged is null or has no groups, duplicate_groups stays empty.
-  const fileMap = new Map();
-  const duplicateGroups = [];
-
-  if (dedupMerged && dedupMerged.groups) {
+  // v1: only delete_duplicates is supported in runner-driven profile runs.
+  // Other policies (remove_temp_files, remove_large_files) are accepted by
+  // janitorProfiles.validate() for forward compatibility but produce no
+  // actions here — they require the full scan _fileMap that buildSuggestions
+  // expects, which the runner does not assemble. Use the disk janitor's
+  // /janitor/suggest endpoint for those policies in v1.
+  const actions = [];
+  if (profile.policies.includes('delete_duplicates') && dedupMerged) {
     for (const group of dedupMerged.groups) {
-      if (!group.files || group.files.length < 2) continue;
-      const hash = group.hash || group._id || String(Math.random());
-      // Sort files oldest-first (mtime ascending)
+      // Sort files by mtime ascending (oldest first), keep oldest, delete the rest
       const sorted = [...group.files].sort((a, b) => (a.mtime || 0) - (b.mtime || 0));
-      fileMap.set(hash, sorted);
-      duplicateGroups.push({
-        hash,
-        wasted: (group.file_size || 0) * (sorted.length - 1)
+      const toDelete = sorted.slice(1);
+      if (toDelete.length === 0) continue;
+      actions.push({
+        policy: 'delete_duplicates',
+        files: toDelete.map(f => f.path),
+        reason: `Duplicate of ${sorted[0].path}`,
+        space_saved: (group.file_size || 0) * toDelete.length,
+        status: 'pending',
+        executed_at: null,
+        result: null
       });
     }
   }
-
-  const analysis = {
-    duplicate_groups: duplicateGroups,
-    _fileMap: fileMap
-  };
-
-  const activePolicies = profile.policies || [];
-  const suggestions = janitorService.buildSuggestions(analysis, activePolicies);
-
-  return suggestions.map(s => ({
-    ...s,
-    status: 'pending',
-    executed_at: null,
-    result: null
-  }));
+  return actions;
 }
 
 async function _runAiTriage(profile, runDoc, proposedActions, scanCounts) {
@@ -245,6 +232,9 @@ async function getRun(db, runId) {
 
 async function approveAction(db, runId, actionIdx) {
   if (!ObjectId.isValid(runId)) return { ok: false, notFound: true };
+  if (typeof actionIdx !== 'number' || !Number.isInteger(actionIdx) || actionIdx < 0) {
+    return { ok: false, error: 'invalid action index' };
+  }
   const run = await db.collection(COLLECTION).findOne({ _id: new ObjectId(runId) });
   if (!run) return { ok: false, notFound: true };
 
@@ -259,6 +249,9 @@ async function approveAction(db, runId, actionIdx) {
     return { ok: false, error: result.error };
   }
 
+  // v1 limitation: if executeCleanup processed zero files (e.g. all paths missing
+  // from disk), the action stays 'pending' — allowing re-approval. A separate
+  // 'execution_failed' state is deferred to v2 to avoid blocking on this edge.
   const newStatus = (result.deleted?.length || 0) > 0 ? 'executed' : 'pending';
   const updatedAction = {
     ...action,
@@ -281,6 +274,9 @@ async function approveAction(db, runId, actionIdx) {
 
 async function rejectAction(db, runId, actionIdx) {
   if (!ObjectId.isValid(runId)) return { ok: false, notFound: true };
+  if (typeof actionIdx !== 'number' || !Number.isInteger(actionIdx) || actionIdx < 0) {
+    return { ok: false, error: 'invalid action index' };
+  }
   const run = await db.collection(COLLECTION).findOne({ _id: new ObjectId(runId) });
   if (!run) return { ok: false, notFound: true };
 

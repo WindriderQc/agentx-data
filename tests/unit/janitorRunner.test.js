@@ -23,13 +23,9 @@ jest.mock('../../services/dedupScanner', () => ({
   buildDedupReport: jest.fn(),
   saveReport: jest.fn()
 }));
-jest.mock('../../services/janitorService', () => {
-  const actual = jest.requireActual('../../services/janitorService');
-  return {
-    ...actual,
-    buildSuggestions: jest.fn(() => [])
-  };
-});
+// janitorService is used by approveAction (executeCleanup, generateCleanupToken)
+// and is not mocked here — those functions are pure and don't need stubs for
+// the runProfile tests below.
 jest.mock('../../services/janitorAI', () => ({
   callAI: jest.fn()
 }));
@@ -37,7 +33,6 @@ jest.mock('../../services/janitorAI', () => ({
 const janitorProfiles = require('../../services/janitorProfiles');
 const scannerMod = require('../../services/scanner');
 const dedupScanner = require('../../services/dedupScanner');
-const janitorService = require('../../services/janitorService');
 const janitorAI = require('../../services/janitorAI');
 const janitorRunner = require('../../services/janitorRunner');
 
@@ -90,11 +85,21 @@ const profileFixture = {
 describe('janitorRunner.runProfile', () => {
   test('happy path: scan → dedup → persist run as complete', async () => {
     janitorProfiles.get.mockResolvedValue(profileFixture);
-    dedupScanner.buildDedupReport.mockResolvedValue({ groups: [], summary: {} });
+    // Dedup returns one group with two files; the runner should keep the older one
+    // (mtime 100) and propose deleting the newer one (mtime 200).
+    dedupScanner.buildDedupReport.mockResolvedValue({
+      groups: [{
+        hash: 'abc123',
+        count: 2,
+        file_size: 500,
+        files: [
+          { path: '/mnt/datalake/old.txt', mtime: 100, size: 500 },
+          { path: '/mnt/datalake/new.txt', mtime: 200, size: 500 }
+        ]
+      }],
+      summary: { total_duplicate_groups: 1, total_duplicate_files: 2, total_wasted_space: 500 }
+    });
     dedupScanner.saveReport.mockResolvedValue(new ObjectId());
-    janitorService.buildSuggestions.mockReturnValue([
-      { policy: 'delete_duplicates', files: ['/a', '/b'], reason: 'dup', space_saved: 100 }
-    ]);
 
     const db = makeMockDb();
     const result = await janitorRunner.runProfile(db, String(profileFixture._id));
@@ -107,7 +112,13 @@ describe('janitorRunner.runProfile', () => {
     expect(runs[0].status).toBe('complete');
     expect(runs[0].profile_name).toBe('Test Profile');
     expect(runs[0].proposed_actions).toHaveLength(1);
-    expect(runs[0].proposed_actions[0].status).toBe('pending');
+    const action = runs[0].proposed_actions[0];
+    expect(action.policy).toBe('delete_duplicates');
+    expect(action.files).toEqual(['/mnt/datalake/new.txt']);
+    expect(action.reason).toContain('/mnt/datalake/old.txt');
+    expect(action.status).toBe('pending');
+    expect(action.executed_at).toBeNull();
+    expect(action.result).toBeNull();
   });
 
   test('returns notFound when profile does not exist', async () => {
