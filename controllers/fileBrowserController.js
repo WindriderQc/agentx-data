@@ -2,6 +2,7 @@ const path = require('path');
 const { formatFileSize } = require('../utils/file-operations');
 const { formatFilePath } = require('../utils/fileHelpers');
 const { resolveAllowedPath } = require('../services/janitorService');
+const { categoryToExts } = require('../utils/categories');
 
 class FileBrowserController {
   static async browseFiles(req, res, next) {
@@ -27,7 +28,6 @@ class FileBrowserController {
       if (ext) {
         filter.ext = ext.toLowerCase();
       } else if (category) {
-        const { categoryToExts } = require('../utils/categories');
         const exts = categoryToExts(category);
         if (exts) filter.ext = { $in: [...exts] };
       }

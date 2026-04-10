@@ -1,4 +1,3 @@
-'use strict';
 const { CATEGORIES, categoryToExts } = require('../../utils/categories');
 
 describe('CATEGORIES map', () => {
@@ -23,7 +22,13 @@ describe('CATEGORIES map', () => {
   });
 
   test('CATEGORIES is frozen', () => {
-    expect(() => { CATEGORIES.document = []; }).toThrow();
+    expect(Object.isFrozen(CATEGORIES)).toBe(true);
+  });
+
+  test('inner category arrays are frozen', () => {
+    for (const exts of Object.values(CATEGORIES)) {
+      expect(Object.isFrozen(exts)).toBe(true);
+    }
   });
 });
 
