@@ -30,4 +30,4 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Run deploy script
-        run: bash /home/yb/codes/agentx-platform/scripts/deploy-main.sh
+        run: bash /home/yb/codes/agentx-platform/scripts/deploy-main.sh --restart-service agentx-data
