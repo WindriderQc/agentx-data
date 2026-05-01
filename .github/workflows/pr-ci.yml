@@ -1,0 +1,39 @@
+# PR CI — agentx-data
+#
+# Task 0152 (bootstrap GitHub Actions PR CI for Jules across all AgentX repos).
+#
+# Runs the standard `npm test` command. All tests are pure unit tests with
+# mocked storage / network clients — no external Mongo or NAS scan required.
+#
+# Local baseline (2026-04-30, Node 22):
+#   Test Suites: 19 passed, 19 total
+#   Tests:       223 passed, 223 total
+name: pr-ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          CI: 'true'
