@@ -1,0 +1,33 @@
+# Deploy on merge to main — agentx-ecosystem
+#
+# Triggered when main is updated (PR merge, direct push). Runs on the
+# self-hosted runner labeled `self-hosted, ugclawdx, deploy` — the
+# operator-host runner that has filesystem access to the live checkout
+# and PM2. See docs/operations/self-hosted-runner-setup.md for the
+# one-time install steps.
+#
+# All this workflow does is invoke scripts/deploy-main.sh, which:
+#   1. ff-pulls all 5 repos (ecosystem + core + benchmark + rag + data)
+#   2. detects which service SHAs moved
+#   3. runs `pm2 delete <svc> && pm2 start ecosystem.config.js --only <svc>`
+#      for each service whose code changed (per memory feedback_pm2_restart,
+#      delete+start beats pm2 restart for fresh-code reloads)
+#   4. skips repos with dirty trees rather than blindly resetting
+#
+# The script is idempotent and serial per-repo — safe to fire from
+# multiple service repos in quick succession (per memory
+# feedback_parallel_workers_same_repo).
+
+name: deploy-on-main
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, ugclawdx, deploy]
+    timeout-minutes: 10
+    steps:
+      - name: Run deploy script
+        run: bash /home/yb/codes/agentx-platform/scripts/deploy-main.sh
